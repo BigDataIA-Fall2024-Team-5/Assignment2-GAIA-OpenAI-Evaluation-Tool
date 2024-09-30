@@ -16,4 +16,6 @@ def admin_page():
     # Admin action buttons
     st.button("Manage Dataset", on_click=lambda: st.session_state.update(page='admin_dataset_management'))
     st.button("Manage Users", on_click=lambda: st.session_state.update(page='admin_user_management'))
-    st.button("Logout", on_click=lambda: st.session_state.update(page='login'))
+
+    # Logout button triggers the logout callback in newapp.py
+    st.button("Logout", on_click=lambda: st.session_state.update(page='logout'))

@@ -1,4 +1,3 @@
-#newapp.py
 import os
 import streamlit as st
 import pandas as pd
@@ -22,6 +21,10 @@ def main():
     st.session_state.setdefault('username', '')
     st.session_state.setdefault('user_id', None)  # Ensure 'user_id' is initialized properly
     st.session_state.setdefault('role', '')
+
+    # Handle logout action
+    if st.session_state.page == 'logout':
+        logout()  # Call the logout function to reset session and navigate to login
 
     # Ensure user is logged in before accessing certain pages
     if st.session_state.page in ['main', 'explore_questions', 'admin', 'view_summary'] and not st.session_state['login_success']:
@@ -80,12 +83,23 @@ def go_to_admin_dataset_management():
 def go_to_admin_user_management():
     st.session_state.page = 'admin_user_management'
 
+# Keep the logout function in newapp.py
 def logout():
     # Clear the session state except for 'page' to properly manage logout behavior
     for key in list(st.session_state.keys()):
         if key != 'page':  # Do not clear 'page' to avoid resetting navigation
             del st.session_state[key]
-    st.session_state.page = 'login'  # Redirect back to login
+
+    # Reset necessary session state variables for login
+    st.session_state['username'] = ''
+    st.session_state['password'] = ''
+    st.session_state['login_success'] = False
+    st.session_state['role'] = ''
+    st.session_state['user_id'] = None
+
+    # Redirect to the login page
+    st.session_state.page = 'login'
+
 
 # Landing Page
 def run_landing_page():

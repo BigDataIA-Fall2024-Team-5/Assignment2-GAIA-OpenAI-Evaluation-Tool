@@ -4,7 +4,11 @@ import bcrypt
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 from sqlalchemy.types import NVARCHAR, Integer, DateTime
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import SQLAlchemyError, OperationalError
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Load environment variables
 load_dotenv()
@@ -103,7 +107,7 @@ def fetch_dataframe_from_sql(table_name='GaiaDataset'):
 
 def fetch_user_results(user_id):
     """
-    Fetches the user-specific results from the Azure SQL Database.
+    Fetches the user-specific results from the Azure SQL Database with enhanced error handling.
     """
     try:
         connection_string = get_sqlalchemy_connection_string()
@@ -125,11 +129,20 @@ def fetch_user_results(user_id):
             df = pd.DataFrame(result, columns=['user_id', 'task_id', 'user_result_status', 'chatgpt_response'])
             return df
         else:
-            return None  # No results found for the user
+            return pd.DataFrame()  # Return an empty DataFrame if no results found
 
+    except OperationalError as e:
+        logging.error(f"Database connection error: {e}")
+        raise RuntimeError("Unable to connect to the database. Please try again later.")
+    
+    except SQLAlchemyError as e:
+        logging.error(f"SQLAlchemy error: {e}")
+        raise RuntimeError("A database error occurred. Please contact support.")
+    
     except Exception as e:
-        print(f"Error fetching user results: {e}")
-        return None
+        logging.error(f"Unexpected error: {e}")
+        raise RuntimeError("An unexpected error occurred. Please contact support.")
+
 
 def update_user_result(user_id, task_id, status, chatgpt_response, table_name='user_results'):
     """
@@ -169,7 +182,7 @@ def update_user_result(user_id, task_id, status, chatgpt_response, table_name='u
 # Function to fetch user information based on username
 def fetch_user_from_sql(username):
     """
-    Fetch user information based on username.
+    Fetch user information based on username with enhanced error handling.
     """
     try:
         connection_string = get_sqlalchemy_connection_string()
@@ -180,12 +193,21 @@ def fetch_user_from_sql(username):
             result = connection.execute(query, {"username": username}).fetchone()
 
         if result:
-            return dict(result._mapping)
-        return None
+            return dict(result._mapping)  # Returns a dict of user data
+        return None  # User not found
+    
+    except OperationalError as e:
+        logging.error(f"Database connection error: {e}")
+        raise RuntimeError("Unable to connect to the database. Please try again later.")
+    
+    except SQLAlchemyError as e:
+        logging.error(f"SQLAlchemy error: {e}")
+        raise RuntimeError("A database error occurred. Please contact support.")
     
     except Exception as e:
-        print(f"Error fetching user: {e}")
-        return None
+        logging.error(f"Unexpected error: {e}")
+        raise RuntimeError("An unexpected error occurred. Please contact support.")
+
 
 # Function to insert a new user with a hashed password
 def insert_user_to_sql(username, password, role):
@@ -240,26 +262,47 @@ def fetch_all_users():
         print(f"Error fetching users: {e}")
         return None
 
-# Function to remove a user from the database
 def remove_user(username):
     """
-    Remove a user from the database.
+    Remove a user from the database along with related user_results.
     """
     try:
         connection_string = get_sqlalchemy_connection_string()
         engine = create_engine(connection_string)
 
-        query = text("DELETE FROM users WHERE username = :username")
+        # First, fetch the user_id of the user based on the username
+        user_query = text("SELECT user_id FROM users WHERE username = :username")
         with engine.connect() as connection:
-            transaction = connection.begin()
-            try:
-                result = connection.execute(query, {"username": username})
-                transaction.commit()
-                return result.rowcount > 0
-            except SQLAlchemyError as e:
-                transaction.rollback()
-                print(f"Error removing user: {e}")
-                return False
+            user_id_result = connection.execute(user_query, {"username": username}).fetchone()
+
+        if user_id_result:
+            # Access the user_id using tuple indexing
+            user_id = user_id_result[0]
+
+            with engine.connect() as connection:
+                transaction = connection.begin()
+                try:
+                    # Step 1: Delete all related rows from the user_results table
+                    delete_results_query = text("DELETE FROM user_results WHERE user_id = :user_id")
+                    connection.execute(delete_results_query, {"user_id": user_id})
+
+                    # Step 2: Delete the user from the users table
+                    delete_user_query = text("DELETE FROM users WHERE username = :username")
+                    connection.execute(delete_user_query, {"username": username})
+
+                    transaction.commit()
+                    print(f"User '{username}' and related results successfully deleted.")
+                    return True
+
+                except SQLAlchemyError as e:
+                    transaction.rollback()
+                    print(f"Error during transaction: {e}")
+                    return False
+
+        else:
+            print(f"User '{username}' not found.")
+            return False  # User not found
+
     except Exception as e:
         print(f"Error: {e}")
         return False
