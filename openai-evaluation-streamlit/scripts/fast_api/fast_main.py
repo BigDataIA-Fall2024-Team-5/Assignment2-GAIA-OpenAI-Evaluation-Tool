@@ -1,4 +1,4 @@
-# app.py
+# fast_main
 import logging
 from fastapi import FastAPI
 from scripts.fast_api.auth import auth_router
