@@ -88,6 +88,6 @@ def admin_user_management_page():
     else:
         st.write("No users found.")
 
-    st.button("Back to Admin", on_click=lambda: st.session_state.update(page='admin'))
+    st.button("Back to Admin", on_click=lambda: st.session_state.update(page='admin_page'))
 
     

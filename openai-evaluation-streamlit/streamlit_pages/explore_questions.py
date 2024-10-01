@@ -23,7 +23,7 @@ def go_back_to_main():
     st.session_state.chatgpt_response = None  # Reset ChatGPT response
 
     # Navigate back to the main page without clearing username/session data
-    st.session_state.page = 'main'
+    st.session_state.page = 'user_page'
 
 # Callback function for handling 'Send to ChatGPT'
 def handle_send_to_chatgpt(selected_row, selected_row_index, preprocessed_data):

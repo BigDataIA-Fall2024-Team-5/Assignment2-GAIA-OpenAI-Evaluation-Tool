@@ -10,6 +10,7 @@ from streamlit_pages.register_page import register_page
 from streamlit_pages.admin_page import admin_page
 from streamlit_pages.admin_dataset_management import admin_dataset_management_page
 from streamlit_pages.admin_user_management import admin_user_management_page
+from streamlit_pages.user_page import user_page
 
 # Load environment variables
 load_dotenv()
@@ -33,12 +34,8 @@ def main():
     st.write(f"user: {st.session_state.get('user')}")
     st.write(f"Role: {st.session_state.get('role')}")
 
-    # Handle logout action
-    if st.session_state.page == 'logout':
-        logout()
-
     # Ensure user is logged in before accessing certain pages
-    if st.session_state.page in ['main', 'explore_questions', 'admin', 'view_summary'] and not st.session_state['login_success']:
+    if st.session_state.page in ['user_page', 'explore_questions', 'admin', 'view_summary'] and not st.session_state['login_success']:
         st.error("Please log in to access this page.")
         st.session_state.page = 'login'  # Redirect to login page
         return
@@ -50,9 +47,9 @@ def main():
         login_page()
     elif st.session_state.page == 'register':
         register_page()
-    elif st.session_state.page == 'main':
-        run_main_page()
-    elif st.session_state.page == 'admin':
+    elif st.session_state.page == 'user_page':
+        user_page() 
+    elif st.session_state.page == 'admin_page':
         admin_page()
     elif st.session_state.page == 'admin_dataset_management':
         admin_dataset_management_page()
@@ -67,73 +64,11 @@ def main():
 def go_to_login():
     st.session_state.page = 'login'
 
-def go_back_to_main():
-    # Only change the page and preserve the session state
-    st.session_state.page = 'main'
-
-def go_to_admin():
-    st.session_state.page = 'admin'
-
-def go_to_explore_questions():
-    st.session_state.page = 'explore_questions'
-
-def go_to_view_summary():
-    st.session_state.page = 'view_summary'
-
-def go_to_register():
-    st.session_state.page = 'register'
-
-def go_to_admin_dataset_management():
-    st.session_state.page = 'admin_dataset_management'
-
-def go_to_admin_user_management():
-    st.session_state.page = 'admin_user_management'
-
-# Keep the logout function in newapp.py
-def logout():
-    # Clear the session state except for 'page' to properly manage logout behavior
-    for key in list(st.session_state.keys()):
-        if key != 'page':  # Do not clear 'page' to avoid resetting navigation
-            del st.session_state[key]
-
-    # Debug: Confirm that logout has been called
-    st.write("### Debug Info: User Logged Out")
-
-    # Reset necessary session state variables for login
-    st.session_state['username'] = ''
-    st.session_state['password'] = ''
-    st.session_state['login_success'] = False
-    st.session_state['role'] = ''
-    st.session_state['user_id'] = None
-
-    # Redirect to the login page
-    st.session_state.page = 'login'
-
 # Landing Page
 def run_landing_page():
     st.title("OPEN AI EVALUATION APP")
     st.write("Would you like to assess AI's Answering Prowess?")
     st.button("Try It", on_click=go_to_login)
-
-# Main Page
-def run_main_page():
-    if st.session_state.get('login_success', False):
-        st.title("Main Page")
-        
-        # Welcome the user by their username
-        st.write(f"Welcome {st.session_state['username']}!")  # Always display the username
-
-        # Admin section (if the user is an admin)
-        if st.session_state.get('role') == 'admin':
-            st.button("Admin Page", on_click=go_to_admin)
-
-        # Common buttons for all users
-        st.button("Explore Questions", on_click=go_to_explore_questions)
-        st.button("View Summary", on_click=go_to_view_summary)
-        st.button("Log Out", on_click=logout)
-    else:
-        st.error("Please login to access this page.")
-        st.session_state.page = 'login'  # Redirect to login if not logged in
 
 # Explore Questions Page
 def run_explore_questions():

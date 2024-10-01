@@ -46,4 +46,4 @@ def admin_dataset_management_page():
         st.text(st.session_state['dataset_processing_output'])
 
     # Back button to return to the Admin page
-    st.button("Back to Admin", on_click=lambda: st.session_state.update(page='admin'))
+    st.button("Back to Admin", on_click=lambda: st.session_state.update(page='admin_page'))

@@ -35,14 +35,11 @@ def on_login_click():
                 
                 st.success(f"Welcome {result['username']}!")
                 
-                # Debug to see if user_id and username are passed correctly
-                st.write(f"Logged in as: {st.session_state['username']}, User: {st.session_state['user']}, User ID: {st.session_state['user_id']}")
-                
                 # Redirect based on role
                 if result['role'] == 'admin':
-                    st.session_state.page = 'admin'
+                    st.session_state.page = 'admin_page'
                 else:
-                    st.session_state.page = 'main'
+                    st.session_state.page = 'user_page'
             
             elif response.status_code == 404:
                 st.error("Login failed: User not found.")

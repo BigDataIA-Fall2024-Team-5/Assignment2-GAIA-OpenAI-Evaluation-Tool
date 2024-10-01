@@ -81,7 +81,7 @@ async def register(user: UserRegister):
             )
         
         # Check if the username already exists in the database
-        if fetch_user_from_sql(user.username, False):
+        if fetch_user_from_sql(user.username):
             log_and_raise(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="User already exists",

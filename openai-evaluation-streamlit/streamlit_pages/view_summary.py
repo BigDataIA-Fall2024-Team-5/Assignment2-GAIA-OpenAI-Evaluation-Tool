@@ -3,7 +3,7 @@ import streamlit as st
 import pandas as pd
 
 def go_back_to_main():
-    st.session_state.page = 'main'
+    st.session_state.page = 'user_page'
 
 def run_summary_page(df, user_results_df):
     st.title("Summary of Results")
