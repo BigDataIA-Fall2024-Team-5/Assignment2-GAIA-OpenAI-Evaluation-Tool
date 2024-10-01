@@ -27,10 +27,11 @@ def on_login_click():
                 
                 # Store the retrieved values in session state
                 st.session_state['jwt_token'] = result['access_token']
-                st.session_state['role'] = result['role']
-                st.session_state['user'] = result['username']  # Set 'user'
-                st.session_state['username'] = result['username']  # Set 'username' too
-                st.session_state['user_id'] = result.get('user_id', None) 
+                st.session_state['user_id'] = result.get('user_id', None)
+                st.session_state['role'] = result['role'] 
+
+                st.session_state['user'] = result['username'] 
+                st.session_state['username'] = result['username']  
                 st.session_state['login_success'] = True
                 
                 st.success(f"Welcome {result['username']}!")

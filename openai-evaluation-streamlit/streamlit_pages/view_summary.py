@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import streamlit as st
 import pandas as pd
+from scripts.api_utils.azure_sql_utils import fetch_dataframe_from_sql, fetch_user_results
 
 def go_back_to_main():
     st.session_state.page = 'user_page'
@@ -71,3 +72,42 @@ def run_summary_page(df, user_results_df):
     - **Incorrect without Instruction**: The answer was incorrect on the first attempt, without using instructions.
     - **Incorrect with Instruction**: The answer remained incorrect even after providing additional instructions.
     """)
+
+# View Summary Page
+def run_view_summary():
+    # Ensure 'user_id' is available in session state
+    if not st.session_state.get('user_id'):
+        st.error("User ID not found. Please log in again.")
+        st.session_state.page = 'login'  # Redirect to login page
+        return
+
+    # Fetch the main dataset (GaiaDataset)
+    df = fetch_dataframe_from_sql()
+    
+    # Fetch user-specific results (returns None if no results are found)
+    user_results_df = fetch_user_results(st.session_state['user_id'])
+
+    # Ensure the main dataset was fetched successfully
+    if df is None:
+        st.error("Failed to load the main dataset from Azure SQL.")
+        return
+    
+    # If user_results_df is None (no results found for the user), create an empty DataFrame
+    if user_results_df is None or user_results_df.empty:
+        st.write("No user results found. Please complete some questions.")
+        user_results_df = pd.DataFrame(columns=['task_id', 'user_result_status', 'chatgpt_response'])  # Empty DataFrame
+
+    # Drop 'user_result_status' from df (main dataset) to avoid duplication during the merge
+    if 'user_result_status' in df.columns:
+        df = df.drop(columns=['user_result_status'])
+
+    # Merge the two dataframes on 'task_id'
+    merged_df = df.merge(user_results_df[['task_id', 'user_result_status']], on='task_id', how='left')
+
+    # Fill missing 'user_result_status' with 'N/A'
+    merged_df['user_result_status'] = merged_df['user_result_status'].fillna('N/A')
+
+    from streamlit_pages.view_summary import run_summary_page
+
+    # Call the summary page with the merged dataframe
+    run_summary_page(merged_df, user_results_df)

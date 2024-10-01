@@ -10,7 +10,7 @@ logger.setLevel(logging.INFO)
 db_router = APIRouter()
 
 # Fetch all users endpoint
-@db_router.get("/users", tags=["User Management"])
+@db_router.get("/users", tags=["Admin User Management"])
 async def get_all_users():
     """
     Fetch all users from the database.
@@ -30,7 +30,7 @@ async def get_all_users():
         )
 
 # Delete a user by user_id endpoint
-@db_router.delete("/users/{user_id}", tags=["User Management"])
+@db_router.delete("/users/{user_id}", tags=["Admin User Management"])
 async def delete_user(user_id: str, admin: str = Query(...)):
     """
     Delete a user from the database by their user_id.
@@ -52,7 +52,7 @@ async def delete_user(user_id: str, admin: str = Query(...)):
         )
 
 # Promote a user to admin by user_id endpoint
-@db_router.put("/users/{user_id}/promote", tags=["User Management"])
+@db_router.put("/users/{user_id}/promote", tags=["Admin User Management"])
 async def promote_user_to_admin(user_id: str, admin: str = Query(...)):
     """
     Promote a user to the admin role in the database.
