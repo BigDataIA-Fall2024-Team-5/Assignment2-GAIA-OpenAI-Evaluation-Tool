@@ -1,14 +1,23 @@
 import streamlit as st
-from scripts.main import process_dataset  # Import the function directly
+import requests
+
+# FastAPI base URL
+fastapi_url = "http://127.0.0.1:8000/pipeline/process-dataset"
 
 # Callback to trigger dataset processing logic
 def run_dataset_processing():
     try:
-        result = process_dataset()
+        # Send POST request to FastAPI to start dataset processing
+        response = requests.post(fastapi_url)
 
-        # Store the result in session state for display
-        st.session_state['dataset_processing_status'] = "Dataset Processing Complete"
-        st.session_state['dataset_processing_output'] = result
+        # Check if the request was successful
+        if response.status_code == 200:
+            result = response.json()
+            # Store the result in session state for display
+            st.session_state['dataset_processing_status'] = "Dataset Processing Complete"
+            st.session_state['dataset_processing_output'] = result['message']
+        else:
+            st.session_state['dataset_processing_status'] = f"Error: {response.status_code} - {response.text}"
 
     except Exception as e:
         st.session_state['dataset_processing_status'] = f"An unexpected error occurred: {e}"

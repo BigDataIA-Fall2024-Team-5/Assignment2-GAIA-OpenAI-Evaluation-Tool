@@ -15,20 +15,31 @@ from streamlit_pages.admin_user_management import admin_user_management_page
 load_dotenv()
 
 def main():
-    # Set default values for session state using setdefault()
+    # Ensure critical session state values are set and persist throughout the app's navigation
     st.session_state.setdefault('page', 'landing')
     st.session_state.setdefault('login_success', False)
+    st.session_state.setdefault('user', '')
     st.session_state.setdefault('username', '')
-    st.session_state.setdefault('user_id', None)  # Ensure 'user_id' is initialized properly
+    st.session_state.setdefault('password', '')
+    st.session_state.setdefault('user_id', None)
     st.session_state.setdefault('role', '')
+
+    # Debug: Print the current session state values for tracking
+    st.write("### Debug Info")
+    st.write(f"Current Page: {st.session_state.get('page')}")
+    st.write(f"Login Success: {st.session_state.get('login_success')}")
+    st.write(f"Username: {st.session_state.get('username')}")
+    st.write(f"User ID: {st.session_state.get('user_id')}")
+    st.write(f"user: {st.session_state.get('user')}")
+    st.write(f"Role: {st.session_state.get('role')}")
 
     # Handle logout action
     if st.session_state.page == 'logout':
-        logout()  # Call the logout function to reset session and navigate to login
+        logout()
 
     # Ensure user is logged in before accessing certain pages
     if st.session_state.page in ['main', 'explore_questions', 'admin', 'view_summary'] and not st.session_state['login_success']:
-        st.error("Please login to access this page.")
+        st.error("Please log in to access this page.")
         st.session_state.page = 'login'  # Redirect to login page
         return
 
@@ -57,12 +68,7 @@ def go_to_login():
     st.session_state.page = 'login'
 
 def go_back_to_main():
-    # Optionally reset any page-specific states here if needed
-    st.session_state.show_instructions = False
-    st.session_state.current_page = 0
-    st.session_state.last_selected_row_index = None
-
-    # Navigate back to the main page
+    # Only change the page and preserve the session state
     st.session_state.page = 'main'
 
 def go_to_admin():
@@ -90,6 +96,9 @@ def logout():
         if key != 'page':  # Do not clear 'page' to avoid resetting navigation
             del st.session_state[key]
 
+    # Debug: Confirm that logout has been called
+    st.write("### Debug Info: User Logged Out")
+
     # Reset necessary session state variables for login
     st.session_state['username'] = ''
     st.session_state['password'] = ''
@@ -100,7 +109,6 @@ def logout():
     # Redirect to the login page
     st.session_state.page = 'login'
 
-
 # Landing Page
 def run_landing_page():
     st.title("OPEN AI EVALUATION APP")
@@ -109,26 +117,23 @@ def run_landing_page():
 
 # Main Page
 def run_main_page():
-    # Ensure session keys like 'username' and 'login_success' exist
     if st.session_state.get('login_success', False):
         st.title("Main Page")
         
-        # Display username if available, else display default welcome message
-        if st.session_state.get('username'):  # Check if username is present in session state
-            st.write(f"Welcome {st.session_state['username']}!")  # Display username
-        else:
-            st.write("Welcome!")  # Fallback message in case username is missing
+        # Welcome the user by their username
+        st.write(f"Welcome {st.session_state['username']}!")  # Always display the username
 
         # Admin section (if the user is an admin)
         if st.session_state.get('role') == 'admin':
             st.button("Admin Page", on_click=go_to_admin)
 
+        # Common buttons for all users
         st.button("Explore Questions", on_click=go_to_explore_questions)
         st.button("View Summary", on_click=go_to_view_summary)
         st.button("Log Out", on_click=logout)
     else:
         st.error("Please login to access this page.")
-        st.session_state.page = 'login'
+        st.session_state.page = 'login'  # Redirect to login if not logged in
 
 # Explore Questions Page
 def run_explore_questions():

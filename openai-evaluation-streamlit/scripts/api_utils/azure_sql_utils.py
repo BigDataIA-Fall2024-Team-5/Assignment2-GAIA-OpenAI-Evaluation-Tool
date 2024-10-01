@@ -1,18 +1,15 @@
 import os
 import pandas as pd
-import bcrypt
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 from sqlalchemy.types import NVARCHAR, Integer, DateTime
 from sqlalchemy.exc import SQLAlchemyError, OperationalError
-import logging
-
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+from fastapi import HTTPException, status
 
 # Load environment variables
 load_dotenv()
 
+# Centralized utility to get SQLAlchemy connection string
 def get_sqlalchemy_connection_string():
     """
     Constructs an SQLAlchemy connection string for Azure SQL Database.
@@ -22,9 +19,12 @@ def get_sqlalchemy_connection_string():
     password = os.getenv('AZURE_SQL_PASSWORD')
     database = os.getenv('AZURE_SQL_DATABASE')
 
+    if not all([server, user, password, database]):
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Missing database configuration.")
+    
     return f"mssql+pymssql://{user}:{password}@{server}/{database}"
 
-# Function to insert a DataFrame into the SQL table (e.g., for initial data setup)
+
 def insert_dataframe_to_sql(df, table_name):
     """
     Inserts DataFrame into Azure SQL Database (replaces existing table).
@@ -33,41 +33,18 @@ def insert_dataframe_to_sql(df, table_name):
         connection_string = get_sqlalchemy_connection_string()
         engine = create_engine(connection_string)
 
-        # Drop table if it exists
         with engine.connect() as connection:
             transaction = connection.begin()
             try:
                 drop_table_query = text(f"IF OBJECT_ID('{table_name}', 'U') IS NOT NULL DROP TABLE {table_name};")
                 connection.execute(drop_table_query)
                 transaction.commit()
-            except Exception as e:
+            except Exception:
                 transaction.rollback()
-                print(f"Error dropping table: {e}")
-                return
-
-        # Create the table and insert the data
-        with engine.connect() as connection:
-            create_table_query = text(f"""
-                CREATE TABLE {table_name} (
-                    task_id NVARCHAR(50) PRIMARY KEY,
-                    Question NVARCHAR(MAX),
-                    Level INT,
-                    FinalAnswer NVARCHAR(MAX),
-                    file_name NVARCHAR(255),
-                    file_path NVARCHAR(MAX),
-                    Annotator_Metadata_Steps NVARCHAR(MAX),
-                    Annotator_Metadata_Number_of_steps NVARCHAR(MAX),
-                    Annotator_Metadata_How_long_did_this_take NVARCHAR(100),
-                    Annotator_Metadata_Tools NVARCHAR(MAX),
-                    Annotator_Metadata_Number_of_tools INT,
-                    user_result_status NVARCHAR(50) DEFAULT 'N/A',
-                    created_date DATETIME
-                );
-            """)
-            connection.execute(create_table_query)
-
-        # Insert DataFrame into SQL table
-        df.to_sql(table_name, engine, if_exists='append', index=False, dtype={
+                raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to drop existing table.")
+        
+        # Insert the data into the new table
+        df.to_sql(table_name, engine, if_exists='replace', index=False, dtype={
             'task_id': NVARCHAR(length=50),
             'Question': NVARCHAR(length='max'),
             'Level': Integer,
@@ -82,13 +59,14 @@ def insert_dataframe_to_sql(df, table_name):
             'user_result_status': NVARCHAR(length=50),
             'created_date': DateTime
         })
-
-        print(f"Data successfully inserted into {table_name}.")
     
-    except Exception as e:
-        print(f"Error inserting data into Azure SQL: {e}")
+    except SQLAlchemyError:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database error during data insertion.")
+    
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unexpected error during data insertion.")
 
-# Function to fetch the dataset (default, e.g., main table like GaiaDataset)
+
 def fetch_dataframe_from_sql(table_name='GaiaDataset'):
     """
     Fetches data from Azure SQL as a DataFrame.
@@ -101,9 +79,12 @@ def fetch_dataframe_from_sql(table_name='GaiaDataset'):
         df = pd.read_sql(query, con=engine)
         return df
     
-    except Exception as e:
-        print(f"Error fetching data from Azure SQL: {e}")
-        return None
+    except SQLAlchemyError:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database error while fetching data.")
+    
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unexpected error while fetching data.")
+
 
 def fetch_user_results(user_id):
     """
@@ -128,20 +109,16 @@ def fetch_user_results(user_id):
         if result:
             df = pd.DataFrame(result, columns=['user_id', 'task_id', 'user_result_status', 'chatgpt_response'])
             return df
-        else:
-            return pd.DataFrame()  # Return an empty DataFrame if no results found
+        return pd.DataFrame()
 
-    except OperationalError as e:
-        logging.error(f"Database connection error: {e}")
-        raise RuntimeError("Unable to connect to the database. Please try again later.")
+    except OperationalError:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Service unavailable. Please try again later.")
     
-    except SQLAlchemyError as e:
-        logging.error(f"SQLAlchemy error: {e}")
-        raise RuntimeError("A database error occurred. Please contact support.")
+    except SQLAlchemyError:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database error while fetching results.")
     
-    except Exception as e:
-        logging.error(f"Unexpected error: {e}")
-        raise RuntimeError("An unexpected error occurred. Please contact support.")
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unexpected error while fetching results.")
 
 
 def update_user_result(user_id, task_id, status, chatgpt_response, table_name='user_results'):
@@ -172,17 +149,20 @@ def update_user_result(user_id, task_id, status, chatgpt_response, table_name='u
                     'chatgpt_response': chatgpt_response
                 })
                 transaction.commit()
-            except Exception as e:
+            except Exception:
                 transaction.rollback()
-                print(f"Transaction error: {e}")
+                raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error during result update.")
 
-    except Exception as e:
-        print(f"Error updating user result: {e}")
+    except SQLAlchemyError:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database error during result update.")
+    
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unexpected error during result update.")
 
-# Function to fetch user information based on username
+
 def fetch_user_from_sql(username):
     """
-    Fetch user information based on username with enhanced error handling.
+    Fetch user information based on username.
     """
     try:
         connection_string = get_sqlalchemy_connection_string()
@@ -193,31 +173,24 @@ def fetch_user_from_sql(username):
             result = connection.execute(query, {"username": username}).fetchone()
 
         if result:
-            return dict(result._mapping)  # Returns a dict of user data
-        return None  # User not found
+            return dict(result._mapping)
+        return None
     
-    except OperationalError as e:
-        logging.error(f"Database connection error: {e}")
-        raise RuntimeError("Unable to connect to the database. Please try again later.")
+    except OperationalError:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Service unavailable. Please try again later.")
     
-    except SQLAlchemyError as e:
-        logging.error(f"SQLAlchemy error: {e}")
-        raise RuntimeError("A database error occurred. Please contact support.")
+    except SQLAlchemyError:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database error occurred, please contact support.")
     
-    except Exception as e:
-        logging.error(f"Unexpected error: {e}")
-        raise RuntimeError("An unexpected error occurred. Please contact support.")
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An unexpected error occurred.")
 
 
-# Function to insert a new user with a hashed password
-def insert_user_to_sql(username, password, role):
+def insert_user_to_sql(username, hashed_password, role):
     """
     Inserts a new user with a hashed password into the users table.
     """
     try:
-        # Hash the user's password
-        hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-
         connection_string = get_sqlalchemy_connection_string()
         engine = create_engine(connection_string)
 
@@ -235,15 +208,14 @@ def insert_user_to_sql(username, password, role):
                     'role': role
                 })
                 transaction.commit()
-                print(f"User '{username}' added successfully.")
-            except SQLAlchemyError as e:
+            except SQLAlchemyError:
                 transaction.rollback()
-                print(f"Error inserting user: {e}")
+                raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error inserting user.")
+    
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unexpected error occurred during user insertion.")
 
-    except Exception as e:
-        print(f"Unexpected error: {e}")
 
-# Function to fetch all users from the database
 def fetch_all_users():
     """
     Fetch all users from the database.
@@ -258,11 +230,17 @@ def fetch_all_users():
 
         return [row._asdict() for row in result]
     
-    except Exception as e:
-        print(f"Error fetching users: {e}")
-        return None
+    except OperationalError:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Service unavailable. Please try again later.")
+    
+    except SQLAlchemyError:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database error occurred, please contact support.")
+    
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An unexpected error occurred.")
 
-def remove_user(username):
+
+def remove_user(user_id: str):
     """
     Remove a user from the database along with related user_results.
     """
@@ -270,62 +248,66 @@ def remove_user(username):
         connection_string = get_sqlalchemy_connection_string()
         engine = create_engine(connection_string)
 
-        # First, fetch the user_id of the user based on the username
-        user_query = text("SELECT user_id FROM users WHERE username = :username")
         with engine.connect() as connection:
-            user_id_result = connection.execute(user_query, {"username": username}).fetchone()
+            transaction = connection.begin()
+            try:
+                # Delete related user_results
+                delete_results_query = text("DELETE FROM user_results WHERE user_id = :user_id")
+                connection.execute(delete_results_query, {"user_id": user_id})
 
-        if user_id_result:
-            # Access the user_id using tuple indexing
-            user_id = user_id_result[0]
+                # Delete user
+                delete_user_query = text("DELETE FROM users WHERE user_id = :user_id")
+                result = connection.execute(delete_user_query, {"user_id": user_id})
 
-            with engine.connect() as connection:
-                transaction = connection.begin()
-                try:
-                    # Step 1: Delete all related rows from the user_results table
-                    delete_results_query = text("DELETE FROM user_results WHERE user_id = :user_id")
-                    connection.execute(delete_results_query, {"user_id": user_id})
-
-                    # Step 2: Delete the user from the users table
-                    delete_user_query = text("DELETE FROM users WHERE username = :username")
-                    connection.execute(delete_user_query, {"username": username})
-
+                if result.rowcount > 0:
                     transaction.commit()
-                    print(f"User '{username}' and related results successfully deleted.")
                     return True
+                else:
+                    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+            
+            except SQLAlchemyError:
+                transaction.rollback()
+                raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error during user deletion.")
 
-                except SQLAlchemyError as e:
-                    transaction.rollback()
-                    print(f"Error during transaction: {e}")
-                    return False
+    except OperationalError:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Service unavailable. Please try again later.")
+    
+    except SQLAlchemyError:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database error occurred, please contact support.")
+    
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An unexpected error occurred.")
 
-        else:
-            print(f"User '{username}' not found.")
-            return False  # User not found
 
-    except Exception as e:
-        print(f"Error: {e}")
-        return False
-
-# Function to promote a user to admin role
-def promote_to_admin(username):
+def promote_to_admin(user_id: str):
     """
-    Promote a user to admin role.
+    Promote a user to admin role by their user_id.
     """
     try:
         connection_string = get_sqlalchemy_connection_string()
         engine = create_engine(connection_string)
 
-        query = text("UPDATE users SET role = 'admin' WHERE username = :username")
+        query = text("UPDATE users SET role = 'admin' WHERE user_id = :user_id")
         with engine.connect() as connection:
             transaction = connection.begin()
             try:
-                result = connection.execute(query, {"username": username})
+                result = connection.execute(query, {"user_id": user_id})
                 transaction.commit()
-                return result.rowcount > 0
-            except SQLAlchemyError as e:
+
+                if result.rowcount > 0:
+                    return True
+                else:
+                    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+            
+            except SQLAlchemyError:
                 transaction.rollback()
-                print(f"Error promoting user: {e}")
-                return False
-    except Exception as e:
-        print(f"Error: {e}")
+                raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error during user promotion.")
+
+    except OperationalError:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Service unavailable. Please try again later.")
+    
+    except SQLAlchemyError:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database error occurred, please contact support.")
+    
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An unexpected error occurred.")

@@ -1,5 +1,8 @@
 import streamlit as st
-from scripts.api_utils.azure_sql_utils import insert_user_to_sql, fetch_user_from_sql
+import requests
+
+# Define your FastAPI endpoint for registration
+fastapi_url = "http://127.0.0.1:8000/auth/register"
 
 # Callback function to go back to login page
 def go_to_login():
@@ -20,18 +23,38 @@ def handle_register():
     if not username or not password or not confirm_password:
         st.error("All fields are required.")
     else:
-        # Check if the username already exists in the database
-        existing_user = fetch_user_from_sql(username)
-        if existing_user:
-            st.error("Username already exists. Please choose a different username.")
-        elif password == confirm_password:
-            # Insert the user into the database
-            insert_user_to_sql(username, password, 'user')  # Default role is 'user'
-            st.success("Account created successfully! Please log in with your new credentials.")
-            st.session_state['registration_success'] = True
-        else:
-            st.error("Passwords do not match. Please try again.")
+        # Prepare data for FastAPI registration
+        registration_data = {
+            "username": username,
+            "password": password,
+            "confirm_password": confirm_password
+        }
 
+        try:
+            with st.spinner('Creating account...'):
+                # Make POST request to FastAPI
+                response = requests.post(fastapi_url, json=registration_data)
+                
+                if response.status_code == 200:
+                    st.success("Account created successfully! Please log in with your new credentials.")
+                    st.session_state['registration_success'] = True
+                    # Clear the input fields after successful registration
+                    st.session_state['username'] = ''
+                    st.session_state['password'] = ''
+                    st.session_state['confirm_password'] = ''
+                elif response.status_code == 400:
+                    st.error(f"Registration failed: {response.json().get('detail', 'Bad request')}")
+                elif response.status_code == 409:
+                    st.error(f"Registration failed: Username '{username}' already exists.")
+                elif response.status_code == 500:
+                    st.error("Server error. Please try again later.")
+                else:
+                    st.error(f"Unexpected error: {response.status_code}")
+
+        except requests.exceptions.RequestException as e:
+            st.error(f"Registration request failed: {e}")
+
+# Registration page UI
 def register_page():
     st.title("Register a New Account")
 
