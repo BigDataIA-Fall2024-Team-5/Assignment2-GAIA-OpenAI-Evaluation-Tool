@@ -1,11 +1,9 @@
-#azure_sql_utils
 import os
 import pandas as pd
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 from sqlalchemy.types import NVARCHAR, Integer, DateTime
 from sqlalchemy.exc import SQLAlchemyError, OperationalError
-from fastapi import HTTPException, status
 import logging
 import numpy as np
 
@@ -15,12 +13,6 @@ load_dotenv()
 # Initialize logging
 logger = logging.getLogger("uvicorn")
 logger.setLevel(logging.INFO)
-
-# Helper function to log and raise HTTP exceptions
-def log_and_raise(status_code, detail, log_message):
-    logger.warning(log_message)
-    raise HTTPException(status_code=status_code, detail=detail)
-
 
 # Centralized utility to get SQLAlchemy connection string
 def get_sqlalchemy_connection_string():
@@ -33,14 +25,9 @@ def get_sqlalchemy_connection_string():
     database = os.getenv('AZURE_SQL_DATABASE')
 
     if not all([server, user, password, database]):
-        log_and_raise(
-            status.HTTP_500_INTERNAL_SERVER_ERROR,
-            "Missing database configuration.",
-            "Azure SQL environment variables are missing."
-        )
+        raise ValueError("Missing Azure SQL environment variables.")
 
     return f"mssql+pymssql://{user}:{password}@{server}/{database}"
-
 
 # Insert DataFrame to SQL
 def insert_dataframe_to_sql(df, table_name):
@@ -59,11 +46,7 @@ def insert_dataframe_to_sql(df, table_name):
                 transaction.commit()
             except Exception as e:
                 transaction.rollback()
-                log_and_raise(
-                    status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    "Failed to drop existing table.",
-                    f"Error dropping table '{table_name}': {e}"
-                )
+                raise RuntimeError(f"Error dropping table '{table_name}': {e}")
 
         # Insert the data into the new table
         df.to_sql(table_name, engine, if_exists='replace', index=False, dtype={
@@ -78,23 +61,15 @@ def insert_dataframe_to_sql(df, table_name):
             'Annotator_Metadata_How_long_did_this_take': NVARCHAR(length=100),
             'Annotator_Metadata_Tools': NVARCHAR(length='max'),
             'Annotator_Metadata_Number_of_tools': Integer,
-            'user_result_status': NVARCHAR(length=50),
+            'result_status': NVARCHAR(length=50),
             'created_date': DateTime
         })
 
     except SQLAlchemyError as e:
-        log_and_raise(
-            status.HTTP_500_INTERNAL_SERVER_ERROR,
-            "Database error during data insertion.",
-            f"SQLAlchemy error during data insertion: {e}"
-        )
+        raise RuntimeError(f"SQLAlchemy error during data insertion: {e}")
 
     except Exception as e:
-        log_and_raise(
-            status.HTTP_500_INTERNAL_SERVER_ERROR,
-            "Unexpected error during data insertion.",
-            f"Unexpected error: {e}"
-        )
+        raise RuntimeError(f"Unexpected error during data insertion: {e}")
 
 def convert_numpy_types(data):
     """
@@ -122,18 +97,10 @@ def fetch_all_questions(table_name='GaiaDataset'):
         return result
 
     except SQLAlchemyError as e:
-        log_and_raise(
-            status.HTTP_500_INTERNAL_SERVER_ERROR,
-            "Database error while fetching data.",
-            f"SQLAlchemy error during data fetch: {e}"
-        )
+        raise RuntimeError(f"SQLAlchemy error during data fetch: {e}")
 
     except Exception as e:
-        log_and_raise(
-            status.HTTP_500_INTERNAL_SERVER_ERROR,
-            "Unexpected error while fetching data.",
-            f"Unexpected error: {e}"
-        )
+        raise RuntimeError(f"Unexpected error while fetching data: {e}")
 
 
 # Fetch user results
@@ -170,25 +137,16 @@ def fetch_user_results(user_id):
         return []
 
     except OperationalError as e:
-        log_and_raise(
-            status.HTTP_503_SERVICE_UNAVAILABLE,
-            "Service unavailable. Please try again later.",
-            f"Operational error: {e}"
-        )
+        raise RuntimeError(f"Operational error: {e}")
 
     except SQLAlchemyError as e:
-        log_and_raise(
-            status.HTTP_500_INTERNAL_SERVER_ERROR,
-            "Database error while fetching results.",
-            f"SQLAlchemy error: {e}"
-        )
+        raise RuntimeError(f"SQLAlchemy error while fetching results: {e}")
 
     except Exception as e:
-        log_and_raise(
-            status.HTTP_500_INTERNAL_SERVER_ERROR,
-            "Unexpected error while fetching results.",
-            f"Unexpected error: {e}"
-        )
+        raise RuntimeError(f"Unexpected error while fetching results: {e}")
+
+
+# Update user result
 def update_user_result_in_db(user_id, task_id, status, chatgpt_response, table_name='user_results'):
     """
     Updates user-specific result and ChatGPT response in the user_results table.
@@ -238,7 +196,6 @@ def update_user_result_in_db(user_id, task_id, status, chatgpt_response, table_n
         return False  
 
 
-
 # Fetch user information
 def fetch_user_from_sql(username):
     """
@@ -257,25 +214,13 @@ def fetch_user_from_sql(username):
         return None
 
     except OperationalError as e:
-        log_and_raise(
-            status.HTTP_503_SERVICE_UNAVAILABLE,
-            "Service unavailable. Please try again later.",
-            f"Operational error: {e}"
-        )
+        raise RuntimeError(f"Operational error: {e}")
 
     except SQLAlchemyError as e:
-        log_and_raise(
-            status.HTTP_500_INTERNAL_SERVER_ERROR,
-            "Database error occurred, please contact support.",
-            f"SQLAlchemy error: {e}"
-        )
+        raise RuntimeError(f"SQLAlchemy error: {e}")
 
     except Exception as e:
-        log_and_raise(
-            status.HTTP_500_INTERNAL_SERVER_ERROR,
-            "An unexpected error occurred.",
-            f"Unexpected error: {e}"
-        )
+        raise RuntimeError(f"Unexpected error: {e}")
 
 
 # Insert user to SQL
@@ -303,18 +248,10 @@ def insert_user_to_sql(username, hashed_password, role):
                 transaction.commit()
             except SQLAlchemyError as e:
                 transaction.rollback()
-                log_and_raise(
-                    status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    "Error inserting user.",
-                    f"SQLAlchemy error during user insertion: {e}"
-                )
+                raise RuntimeError(f"SQLAlchemy error during user insertion: {e}")
 
     except Exception as e:
-        log_and_raise(
-            status.HTTP_500_INTERNAL_SERVER_ERROR,
-            "Unexpected error occurred during user insertion.",
-            f"Unexpected error: {e}"
-        )
+        raise RuntimeError(f"Unexpected error during user insertion: {e}")
 
 
 # Fetch all users
@@ -333,25 +270,13 @@ def fetch_all_users():
         return [row._asdict() for row in result]
 
     except OperationalError as e:
-        log_and_raise(
-            status.HTTP_503_SERVICE_UNAVAILABLE,
-            "Service unavailable. Please try again later.",
-            f"Operational error: {e}"
-        )
+        raise RuntimeError(f"Operational error: {e}")
 
     except SQLAlchemyError as e:
-        log_and_raise(
-            status.HTTP_500_INTERNAL_SERVER_ERROR,
-            "Database error occurred, please contact support.",
-            f"SQLAlchemy error: {e}"
-        )
+        raise RuntimeError(f"SQLAlchemy error: {e}")
 
     except Exception as e:
-        log_and_raise(
-            status.HTTP_500_INTERNAL_SERVER_ERROR,
-            "An unexpected error occurred.",
-            f"Unexpected error: {e}"
-        )
+        raise RuntimeError(f"Unexpected error: {e}")
 
 
 # Remove user
@@ -378,40 +303,20 @@ def remove_user(user_id: str):
                     transaction.commit()
                     return True
                 else:
-                    log_and_raise(
-                        status.HTTP_404_NOT_FOUND,
-                        "User not found.",
-                        f"Failed to find user '{user_id}' during deletion."
-                    )
+                    raise ValueError(f"User '{user_id}' not found during deletion.")
 
             except SQLAlchemyError as e:
                 transaction.rollback()
-                log_and_raise(
-                    status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    "Error during user deletion.",
-                    f"SQLAlchemy error during deletion: {e}"
-                )
+                raise RuntimeError(f"SQLAlchemy error during deletion: {e}")
 
     except OperationalError as e:
-        log_and_raise(
-            status.HTTP_503_SERVICE_UNAVAILABLE,
-            "Service unavailable. Please try again later.",
-            f"Operational error: {e}"
-        )
+        raise RuntimeError(f"Operational error: {e}")
 
     except SQLAlchemyError as e:
-        log_and_raise(
-            status.HTTP_500_INTERNAL_SERVER_ERROR,
-            "Database error occurred, please contact support.",
-            f"SQLAlchemy error: {e}"
-        )
+        raise RuntimeError(f"SQLAlchemy error: {e}")
 
     except Exception as e:
-        log_and_raise(
-            status.HTTP_500_INTERNAL_SERVER_ERROR,
-            "An unexpected error occurred.",
-            f"Unexpected error: {e}"
-        )
+        raise RuntimeError(f"Unexpected error: {e}")
 
 
 # Promote user to admin
@@ -433,37 +338,17 @@ def promote_to_admin(user_id: str):
                 if result.rowcount > 0:
                     return True
                 else:
-                    log_and_raise(
-                        status.HTTP_404_NOT_FOUND,
-                        "User not found.",
-                        f"Failed to find user '{user_id}' for promotion."
-                    )
+                    raise ValueError(f"User '{user_id}' not found for promotion.")
 
             except SQLAlchemyError as e:
                 transaction.rollback()
-                log_and_raise(
-                    status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    "Error during user promotion.",
-                    f"SQLAlchemy error during promotion: {e}"
-                )
+                raise RuntimeError(f"SQLAlchemy error during promotion: {e}")
 
     except OperationalError as e:
-        log_and_raise(
-            status.HTTP_503_SERVICE_UNAVAILABLE,
-            "Service unavailable. Please try again later.",
-            f"Operational error: {e}"
-        )
+        raise RuntimeError(f"Operational error: {e}")
 
     except SQLAlchemyError as e:
-        log_and_raise(
-            status.HTTP_500_INTERNAL_SERVER_ERROR,
-            "Database error occurred, please contact support.",
-            f"SQLAlchemy error: {e}"
-        )
+        raise RuntimeError(f"SQLAlchemy error: {e}")
 
     except Exception as e:
-        log_and_raise(
-            status.HTTP_500_INTERNAL_SERVER_ERROR,
-            "An unexpected error occurred.",
-            f"Unexpected error: {e}"
-        )
+        raise RuntimeError(f"Unexpected error: {e}")
