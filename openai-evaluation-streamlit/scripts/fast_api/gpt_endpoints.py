@@ -2,8 +2,11 @@ import os
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional
+import logging
 from scripts.api_utils.chatgpt_utils import get_chatgpt_response, compare_and_update_status, init_openai
 
+# Set up a logger
+logger = logging.getLogger("uvicorn")
 
 # Define the request body models
 class AskRequest(BaseModel):
@@ -31,8 +34,22 @@ async def ask_gpt(request: AskRequest):
         # Pass the extracted data to the ChatGPT function
         response = get_chatgpt_response(question, instructions, preprocessed_data)
         return {"response": response}
+
+    except ValueError as ve:
+        logger.error(f"Value error in ask_gpt: {ve}")
+        raise HTTPException(status_code=400, detail=f"Invalid input data: {ve}")
+    
+    except ConnectionError as ce:
+        logger.error(f"Connection error in ask_gpt: {ce}")
+        raise HTTPException(status_code=503, detail="Unable to connect to external service. Please try again later.")
+    
+    except TimeoutError as te:
+        logger.error(f"Timeout in ask_gpt: {te}")
+        raise HTTPException(status_code=504, detail="Request timed out. Please try again later.")
+    
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Unexpected error in ask_gpt: {e}")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred. Please contact support.")
 
 # Endpoint to compare GPT's response with an expected answer
 @gpt_router.post("/compare")
@@ -47,5 +64,19 @@ async def compare_gpt(compare_request: CompareRequest):
         comparison_result = compare_and_update_status(row, chatgpt_response, instructions)
 
         return {"comparison_result": comparison_result}
+
+    except ValueError as ve:
+        logger.error(f"Value error in compare_gpt: {ve}")
+        raise HTTPException(status_code=400, detail=f"Invalid input data: {ve}")
+    
+    except ConnectionError as ce:
+        logger.error(f"Connection error in compare_gpt: {ce}")
+        raise HTTPException(status_code=503, detail="Unable to connect to external service. Please try again later.")
+    
+    except TimeoutError as te:
+        logger.error(f"Timeout in compare_gpt: {te}")
+        raise HTTPException(status_code=504, detail="Request timed out. Please try again later.")
+    
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Unexpected error in compare_gpt: {e}")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred. Please contact support.")

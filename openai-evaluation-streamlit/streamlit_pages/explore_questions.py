@@ -2,8 +2,6 @@
 import os
 import streamlit as st
 import pandas as pd
-from scripts.api_utils.chatgpt_utils import get_chatgpt_response, compare_and_update_status, init_openai
-from scripts.api_utils.amazon_s3_utils import read_pdf_summary_from_s3, init_s3_client
 import requests
 
 # FastAPI URLs
@@ -126,6 +124,44 @@ def fetch_pdf_summary_from_fastapi(file_name, extraction_method):
         st.error(f"Error fetching PDF summary: {e}")
         return None
 
+def get_chatgpt_response_via_fastapi(question, instructions=None, preprocessed_data=None):
+    try:
+        data = {
+            "question": question,
+            "instructions": instructions,
+            "preprocessed_data": preprocessed_data
+        }
+        
+        response = requests.post(f"{FASTAPI_URL}/gpt/ask", json=data)
+        
+        if response.status_code == 200:
+            return response.json().get("response", "No response from ChatGPT")
+        else:
+            st.error(f"Failed to get ChatGPT response: {response.status_code}")
+            return "Error in fetching ChatGPT response"
+    
+    except Exception as e:
+        st.error(f"Error communicating with FastAPI: {e}")
+        return "Error in fetching ChatGPT response"
+    
+# Function to compare response using FastAPI
+def compare_and_update_status_via_fastapi(selected_row, chatgpt_response, instructions):
+    try:
+        data = {
+            "row": selected_row.to_dict(),
+            "chatgpt_response": chatgpt_response,
+            "instructions": instructions
+        }
+        response = requests.post(f"{FASTAPI_URL}/gpt/compare", json=data)
+        if response.status_code == 200:
+            return response.json().get("comparison_result", "Error")
+        else:
+            st.error(f"Failed to compare response: {response.status_code}")
+            return "Error"
+    except Exception as e:
+        st.error(f"Error comparing response: {e}")
+        return "Error"
+
 # Callback function for handling 'Send to ChatGPT'
 def handle_send_to_chatgpt(selected_row, selected_row_index, preprocessed_data):
     user_id = st.session_state.get('user_id') 
@@ -140,7 +176,7 @@ def handle_send_to_chatgpt(selected_row, selected_row_index, preprocessed_data):
     use_instructions = current_status.startswith("Incorrect")
     
     # Call ChatGPT API, passing the preprocessed file data instead of a URL
-    chatgpt_response = get_chatgpt_response(
+    chatgpt_response = get_chatgpt_response_via_fastapi(
         selected_row['Question'], 
         instructions=st.session_state.instructions if use_instructions else None, 
         preprocessed_data=preprocessed_data
@@ -148,7 +184,7 @@ def handle_send_to_chatgpt(selected_row, selected_row_index, preprocessed_data):
 
     if chatgpt_response:
         # Compare response with the final answer
-        status = compare_and_update_status(selected_row, chatgpt_response, st.session_state.instructions if use_instructions else None)
+        status = compare_and_update_status_via_fastapi(selected_row, chatgpt_response, st.session_state.instructions if use_instructions else None)
         
         # Update the status in session state immediately
         st.session_state.user_results.at[selected_row_index, 'user_result_status'] = status
@@ -241,9 +277,6 @@ def run_explore_questions():
     aws_access_key = os.getenv('AWS_ACCESS_KEY')
     aws_secret_key = os.getenv('AWS_SECRET_KEY')
     bucket_name = os.getenv('S3_BUCKET_NAME')
-
-    init_openai(openai_api_key)
-    s3_client = init_s3_client(aws_access_key, aws_secret_key)
 
     # Fetch the questions from FastAPI
     df = fetch_dataframe_from_fastapi()
@@ -387,7 +420,7 @@ def run_explore_questions():
         # Show "Send to ChatGPT with Instructions" button instead
         if st.button("Send to ChatGPT with Instructions", key=f'send_button_{selected_row_index}'):
             # Use the updated instructions to query ChatGPT
-            chatgpt_response = get_chatgpt_response(
+            chatgpt_response = get_chatgpt_response_via_fastapi(
                 selected_row['Question'], 
                 instructions=st.session_state.instructions, 
                 preprocessed_data=preprocessed_data
@@ -397,7 +430,7 @@ def run_explore_questions():
                 st.write(f"**ChatGPT's Response with Instructions:** {chatgpt_response}")
 
                 # Compare and update status based on ChatGPT's response
-                status = compare_and_update_status(selected_row, chatgpt_response, st.session_state.instructions)
+                status = compare_and_update_status_via_fastapi(selected_row, chatgpt_response, st.session_state.instructions)
                 st.session_state.user_results.at[selected_row_index, 'user_result_status'] = status
                 current_status = status  # Update current_status
 

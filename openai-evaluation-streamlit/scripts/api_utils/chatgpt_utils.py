@@ -1,10 +1,20 @@
-import os
+import logging
 import openai
-import streamlit as st
-from dotenv import load_dotenv
+from openai.error import OpenAIError, AuthenticationError, RateLimitError, APIConnectionError
 
-# Load environment variables from the .env file
-load_dotenv()
+# Set up the logger for FastAPI
+logging.basicConfig(
+    level=logging.DEBUG,  # Change level to INFO, ERROR as needed
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler()]  # This logs to the console. You can add FileHandler if needed
+)
+
+logger = logging.getLogger("uvicorn")  # Using the uvicorn logger as base, or use __name__
+
+# Configuration for response limits
+MAX_SENTENCES = 10
+MAX_WORDS = 200
+MAX_TOKENS = 300
 
 # Initialize OpenAI API using the provided API key
 def init_openai(api_key):
@@ -16,7 +26,7 @@ def init_openai(api_key):
         raise ValueError("OpenAI API key not provided.")
     
     openai.api_key = api_key
-    print("OpenAI API key assigned successfully.")
+    logger.info("OpenAI API initialized")
 
 # Function to send a question and preprocessed file data to ChatGPT
 def get_chatgpt_response(question, instructions=None, preprocessed_data=None):
@@ -26,62 +36,64 @@ def get_chatgpt_response(question, instructions=None, preprocessed_data=None):
         "content": (
             "You are an AI assistant specialized in providing concise, accurate answers. "
             "Focus on the key information requested without adding unnecessary context. "
-            "Use any provided instructions or reference data to inform your answer. "
-            "For example:\n"
-            "Q: What is 2 + 2? A: 4.\n"
-            "Q: Name the capital of France. A: Paris.\n"
-            "Q: What is the chemical symbol for water? A: H2O.\n"
-            "Respond with only the essential information needed to answer the question."
+            "Use any provided instructions or reference data to inform your answer."
         )
     }
+
+    # Construct the user message, include instructions or preprocessed_data only if they exist
+    user_message = f"Question: {question}\n"
     
-    # Construct the user message with clear structure and instructions
-    user_message = f"""
-Question: {question}
+    if instructions:
+        user_message += f"Instructions: {instructions}\n"
+    
+    if preprocessed_data:
+        user_message += f"Reference Data: {preprocessed_data}\n"
 
-Instructions: {instructions if instructions else 'No specific instructions provided.'}
+    user_message += (
+        "Please provide a concise answer that directly addresses the question. Your response should:\n"
+        f"1. Be no longer than {MAX_SENTENCES} sentences or {MAX_WORDS} words, whichever is shorter.\n"
+        "2. Include only essential information relevant to the question.\n"
+        "3. Use precise language and avoid unnecessary elaboration.\n"
+        "4. If using reference data, integrate it seamlessly without mentioning the source.\n"
+    )
 
-Reference Data: {preprocessed_data if preprocessed_data else 'No reference data available.'}
-
-Please provide a concise answer that directly addresses the question. Your response should:
-1. Be no longer than 3 sentences or 50 words, whichever is shorter.
-2. Include only essential information relevant to the question.
-3. Use precise language and avoid unnecessary elaboration.
-4. If using reference data, integrate it seamlessly without mentioning the source.
-
-Answer:
-"""
-
-    # Debug print for question being sent
-    print(f"Debug: Sending question to ChatGPT: {user_message}")
+    logger.debug(f"Sending question to ChatGPT: {user_message}")
 
     try:
         response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",  # Use the specified model version
+            model="gpt-3.5-turbo",
             messages=[system_message, {"role": "user", "content": user_message}],
-            temperature=0.2,  # Lower temperature for more focused responses
-            max_tokens=100,  # Limit token count to encourage brevity
-            top_p=0.9,  # Slightly reduce randomness in token selection
-            frequency_penalty=0.5,  # Discourage repetition
-            presence_penalty=0.5  # Encourage new concepts when appropriate
+            temperature=0.2,
+            max_tokens=MAX_TOKENS,  # Updated max_tokens to 300 to allow 200 words
+            top_p=0.9,
+            frequency_penalty=0.5,
+            presence_penalty=0.5
         )
         
-        # Extract and process the answer
         answer = response['choices'][0]['message']['content'].strip()
-        
-        # Ensure the answer does not exceed specified constraints
         sentences = answer.split('.')
         words = answer.split()
-        
-        if len(sentences) > 3:
-            answer = '. '.join(sentences[:3]) + '.'
-        if len(words) > 50:
-            answer = ' '.join(words[:50]) + '...'
-        
+
+        if len(sentences) > MAX_SENTENCES:
+            answer = '. '.join(sentences[:MAX_SENTENCES]) + '.'
+        if len(words) > MAX_WORDS:
+            answer = ' '.join(words[:MAX_WORDS]) + '...'
+
+        logger.debug(f"ChatGPT Response: {answer.strip()}")
         return answer.strip()
-    except openai.error.OpenAIError as e:
-        st.error(f"Error calling ChatGPT API: {e}")
-        return None
+
+    except (AuthenticationError, RateLimitError, APIConnectionError) as e:
+        logger.error(f"OpenAI specific error: {e}")
+        return f"Error: {e.user_message}"
+
+    except OpenAIError as e:
+        logger.error(f"General OpenAI API error: {e}")
+        return "An error occurred while processing the request. Please try again later."
+
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        return "An unexpected error occurred. Please contact support."
+
 
 # Compare ChatGPT's response with the expected answer using OpenAI API
 def compare_and_update_status(row, chatgpt_response, instructions):
@@ -106,28 +118,33 @@ Instructions:
 Does the AI's response match the key information in the original answer? Respond with only 'YES' or 'NO'.
 """
 
-    # Debug print for comparison being sent
-    print(f"Debug: Sending comparison prompt to ChatGPT:\n{comparison_prompt}")
+    logger.debug(f"Sending comparison prompt to ChatGPT:\n{comparison_prompt}")
 
     try:
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": comparison_prompt}],
-            temperature=0  # Zero temperature for deterministic results
+            temperature=0
         )
         
         comparison_result = response['choices'][0]['message']['content'].strip().lower()
-        print(f"Comparison result: {comparison_result}")
-        
-        # Normalize and interpret the result
+        logger.debug(f"Comparison Result:\n{comparison_result}")
         if 'yes' in comparison_result:
             return 'Correct with Instruction' if instructions else 'Correct without Instruction'
         elif 'no' in comparison_result:
             return 'Incorrect with Instruction' if instructions else 'Incorrect without Instruction'
         else:
-            st.error(f"Unexpected response from OpenAI: {comparison_result}")
+            logger.error(f"Unexpected response from OpenAI: {comparison_result}")
             return 'Error'
 
-    except openai.error.OpenAIError as e:
-        st.error(f"Error calling OpenAI API for comparison: {e}")
+    except (AuthenticationError, RateLimitError, APIConnectionError) as e:
+        logger.error(f"OpenAI specific error during comparison: {e}")
+        return "Error: OpenAI service is currently unavailable."
+
+    except OpenAIError as e:
+        logger.error(f"General OpenAI API error during comparison: {e}")
+        return 'Error'
+
+    except Exception as e:
+        logger.error(f"Unexpected error during comparison: {e}")
         return 'Error'
