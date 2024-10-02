@@ -1,9 +1,22 @@
+import os
 import openai
 import streamlit as st
+from dotenv import load_dotenv
 
-# Initialize OpenAI API
+# Load environment variables from the .env file
+load_dotenv()
+
+# Initialize OpenAI API using the provided API key
 def init_openai(api_key):
+    """
+    Initializes the OpenAI API with the provided API key.
+    Raises an error if the API key is not provided.
+    """
+    if not api_key:
+        raise ValueError("OpenAI API key not provided.")
+    
     openai.api_key = api_key
+    print("OpenAI API key assigned successfully.")
 
 # Function to send a question and preprocessed file data to ChatGPT
 def get_chatgpt_response(question, instructions=None, preprocessed_data=None):
@@ -44,7 +57,7 @@ Answer:
 
     try:
         response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",  # Keep the specified model version
+            model="gpt-3.5-turbo",  # Use the specified model version
             messages=[system_message, {"role": "user", "content": user_message}],
             temperature=0.2,  # Lower temperature for more focused responses
             max_tokens=100,  # Limit token count to encourage brevity
@@ -66,7 +79,7 @@ Answer:
             answer = ' '.join(words[:50]) + '...'
         
         return answer.strip()
-    except Exception as e:
+    except openai.error.OpenAIError as e:
         st.error(f"Error calling ChatGPT API: {e}")
         return None
 
@@ -104,7 +117,8 @@ Does the AI's response match the key information in the original answer? Respond
         )
         
         comparison_result = response['choices'][0]['message']['content'].strip().lower()
-        print(comparison_result)
+        print(f"Comparison result: {comparison_result}")
+        
         # Normalize and interpret the result
         if 'yes' in comparison_result:
             return 'Correct with Instruction' if instructions else 'Correct without Instruction'
@@ -114,6 +128,6 @@ Does the AI's response match the key information in the original answer? Respond
             st.error(f"Unexpected response from OpenAI: {comparison_result}")
             return 'Error'
 
-    except Exception as e:
+    except openai.error.OpenAIError as e:
         st.error(f"Error calling OpenAI API for comparison: {e}")
         return 'Error'
