@@ -60,15 +60,6 @@ def on_login_click():
     except requests.exceptions.RequestException as e:
         st.error(f"Login request failed: {e}")
 
-# Logout function to clear session
-def logout():
-    # Preserve 'page' in session state while clearing other session state variables
-    for key in list(st.session_state.keys()):
-        if key != 'page':
-            del st.session_state[key]
-    st.session_state['login_success'] = False
-    st.session_state.page = 'login'
-
 # Login page UI
 def login_page():
     st.title("Login to Your Account")
@@ -82,6 +73,3 @@ def login_page():
         st.button("Login", on_click=on_login_click)
         st.button("Create New Account", on_click=go_to_register, key="register_button")
 
-    # Display logout button if login was successful
-    if st.session_state['login_success']:
-        st.button("Log Out", on_click=logout)

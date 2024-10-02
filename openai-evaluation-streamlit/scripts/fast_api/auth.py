@@ -31,7 +31,7 @@ def log_and_raise(status_code, detail, log_message):
 # Login endpoint
 @auth_router.post("/login")
 async def login(user: UserLogin):
-    logger.info(f"Login attempt for user '{user.username}'.")  # Log login attempt
+    logger.info(f"Login attempt for user '{user.username}'.") 
     db_user = fetch_user_from_sql(user.username)
     
     # If the user is not found, log and return specific message
@@ -53,7 +53,6 @@ async def login(user: UserLogin):
     # Create a JWT token for the user
     token = create_access_token({"sub": db_user["username"]})
     
-    # Log the successful login and include the user's role/type
     user_role = db_user.get("role")
     logger.info(f"User '{db_user['username']}' successfully logged in as {user_role}.")
     

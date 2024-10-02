@@ -104,7 +104,7 @@ Does the AI's response match the key information in the original answer? Respond
         )
         
         comparison_result = response['choices'][0]['message']['content'].strip().lower()
-
+        print(comparison_result)
         # Normalize and interpret the result
         if 'yes' in comparison_result:
             return 'Correct with Instruction' if instructions else 'Correct without Instruction'

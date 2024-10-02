@@ -7,9 +7,9 @@ from scripts.fast_api.gpt_endpoints import gpt_router
 from scripts.fast_api.db_endpoints import db_router
 from scripts.fast_api.pipeline_endpoints import pipeline_router
 
-# Set up basic logging configuration
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-logger = logging.getLogger(__name__)
+# Initialize logging
+logger = logging.getLogger("uvicorn")
+logger.setLevel(logging.INFO)
 
 app = FastAPI()
 
@@ -23,5 +23,5 @@ app.include_router(pipeline_router, prefix="/pipeline", tags=["Pipeline"])  # In
 # Root endpoint for checking if the app is running
 @app.get("/")
 async def root():
-    logger.info("Root endpoint accessed")  # Log when the root endpoint is accessed
+    logger.info("Root endpoint accessed") 
     return {"message": "FastAPI Backend for OpenAI Evaluation App"}

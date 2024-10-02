@@ -7,6 +7,7 @@ from sqlalchemy.types import NVARCHAR, Integer, DateTime
 from sqlalchemy.exc import SQLAlchemyError, OperationalError
 from fastapi import HTTPException, status
 import logging
+import numpy as np
 
 # Load environment variables
 load_dotenv()
@@ -95,11 +96,19 @@ def insert_dataframe_to_sql(df, table_name):
             f"Unexpected error: {e}"
         )
 
+def convert_numpy_types(data):
+    """
+    Helper function to convert numpy data types to native Python types.
+    """
+    if isinstance(data, np.generic):  # catches both int64, float64, etc.
+        return data.item()  # convert to native Python type
+    return data
 
 # Fetch DataFrame from SQL
-def fetch_dataframe_from_sql(table_name='GaiaDataset'):
+def fetch_all_questions(table_name='GaiaDataset'):
     """
     Fetches data from Azure SQL as a DataFrame.
+    Returns the data as a JSON-serializable list of dictionaries.
     """
     try:
         connection_string = get_sqlalchemy_connection_string()
@@ -107,7 +116,10 @@ def fetch_dataframe_from_sql(table_name='GaiaDataset'):
 
         query = f"SELECT * FROM {table_name}"
         df = pd.read_sql(query, con=engine)
-        return df
+        
+        # Convert DataFrame to JSON-serializable dictionary
+        result = df.map(convert_numpy_types).to_dict(orient="records")
+        return result
 
     except SQLAlchemyError as e:
         log_and_raise(
@@ -128,6 +140,7 @@ def fetch_dataframe_from_sql(table_name='GaiaDataset'):
 def fetch_user_results(user_id):
     """
     Fetches the user-specific results from the Azure SQL Database.
+    Returns the data as a JSON-serializable list of dictionaries.
     """
     try:
         connection_string = get_sqlalchemy_connection_string()
@@ -147,8 +160,14 @@ def fetch_user_results(user_id):
 
         if result:
             df = pd.DataFrame(result, columns=['user_id', 'task_id', 'user_result_status', 'chatgpt_response'])
-            return df
-        return pd.DataFrame()
+            
+            # Convert DataFrame to JSON-serializable dictionary
+            result = df.map(convert_numpy_types).to_dict(orient="records")
+
+            return result
+        
+        # If no results, return an empty list
+        return []
 
     except OperationalError as e:
         log_and_raise(
@@ -170,12 +189,10 @@ def fetch_user_results(user_id):
             "Unexpected error while fetching results.",
             f"Unexpected error: {e}"
         )
-
-
-# Update user result
-def update_user_result(user_id, task_id, status, chatgpt_response, table_name='user_results'):
+def update_user_result_in_db(user_id, task_id, status, chatgpt_response, table_name='user_results'):
     """
     Updates user-specific result and ChatGPT response in the user_results table.
+    Returns True if successful, False otherwise.
     """
     try:
         connection_string = get_sqlalchemy_connection_string()
@@ -194,34 +211,32 @@ def update_user_result(user_id, task_id, status, chatgpt_response, table_name='u
                         INSERT (user_id, task_id, user_result_status, chatgpt_response) 
                         VALUES (source.user_id, source.task_id, source.status, source.chatgpt_response);
                 """)
-                connection.execute(update_query, {
+
+                # Execute the MERGE query
+                result = connection.execute(update_query, {
                     'user_id': user_id,
                     'task_id': task_id,
                     'status': status,
                     'chatgpt_response': chatgpt_response
                 })
+
+                # Commit transaction
                 transaction.commit()
+                return True 
+
             except Exception as e:
                 transaction.rollback()
-                log_and_raise(
-                    status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    "Error during result update.",
-                    f"Transaction error during result update: {e}"
-                )
+                logger.error(f"Transaction error during result update: {e}")
+                return False 
 
     except SQLAlchemyError as e:
-        log_and_raise(
-            status.HTTP_500_INTERNAL_SERVER_ERROR,
-            "Database error during result update.",
-            f"SQLAlchemy error: {e}"
-        )
+        logger.error(f"SQLAlchemy error during update: {e}")
+        return False 
 
     except Exception as e:
-        log_and_raise(
-            status.HTTP_500_INTERNAL_SERVER_ERROR,
-            "Unexpected error during result update.",
-            f"Unexpected error: {e}"
-        )
+        logger.error(f"Unexpected error during update: {e}")
+        return False  
+
 
 
 # Fetch user information

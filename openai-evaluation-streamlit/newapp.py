@@ -1,6 +1,5 @@
 import os
 import streamlit as st
-import pandas as pd
 from dotenv import load_dotenv
 from streamlit_pages.login_page import login_page
 from streamlit_pages.register_page import register_page
@@ -31,6 +30,7 @@ def main():
     st.write("### Debug Info")
     st.write(f"Current Page: {st.session_state.get('page')}")
     st.write(f"Login Success: {st.session_state.get('login_success')}")
+    st.write(f"username: {st.session_state.get('username')}")
     st.write(f"User ID: {st.session_state.get('user_id')}")
     st.write(f"user: {st.session_state.get('user')}")
     st.write(f"Role: {st.session_state.get('role')}")

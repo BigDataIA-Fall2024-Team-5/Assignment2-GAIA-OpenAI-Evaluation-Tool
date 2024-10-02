@@ -2,11 +2,12 @@
 import os
 import streamlit as st
 import pandas as pd
-from scripts.api_utils.azure_sql_utils import update_user_result, fetch_dataframe_from_sql, fetch_user_results
 from scripts.api_utils.chatgpt_utils import get_chatgpt_response, compare_and_update_status, init_openai
 from scripts.api_utils.amazon_s3_utils import download_file_from_s3, init_s3_client
 from scripts.data_handling.file_processor import preprocess_file
 from scripts.data_handling.delete_cache import delete_cache_folder
+import requests
+
 
 # Define cache directory and temporary file directory
 cache_dir = '.cache'
@@ -71,6 +72,7 @@ def display_question_table():
     return current_df
 
 # Callback function for handling 'Send to ChatGPT'
+# Callback function for handling 'Send to ChatGPT'
 def handle_send_to_chatgpt(selected_row, selected_row_index, preprocessed_data):
     user_id = st.session_state.get('user_id') 
 
@@ -97,8 +99,8 @@ def handle_send_to_chatgpt(selected_row, selected_row_index, preprocessed_data):
         # Update the status in session state immediately
         st.session_state.user_results.at[selected_row_index, 'user_result_status'] = status
     
-        # Update the status in the Azure SQL Database (backend)
-        update_user_result(user_id=user_id, task_id=selected_row['task_id'], status=status, chatgpt_response=chatgpt_response)
+        # Now use the refactored update function to update the user result in FastAPI
+        update_user_result_in_fastapi(user_id, selected_row['task_id'], status, chatgpt_response)
 
         # Store ChatGPT response in session state
         st.session_state.chatgpt_response = chatgpt_response
@@ -110,7 +112,8 @@ def handle_send_to_chatgpt(selected_row, selected_row_index, preprocessed_data):
         if status in ['Correct with Instruction', 'Incorrect with Instruction', 'Incorrect without Instruction']:
             st.session_state.show_instructions = True
         else:
-            st.session_state.show_instructions = False 
+            st.session_state.show_instructions = False
+
 
 def initialize_session_state(df):
     # Initialize session state for pagination and instructions
@@ -127,8 +130,55 @@ def initialize_session_state(df):
     if 'final_status_updated' not in st.session_state:
         st.session_state.final_status_updated = False  # Track if the final status was updated
 
+# FastAPI URLs (replace with your actual FastAPI base URL)
+FASTAPI_URL = "http://localhost:8000"
+
+# Function to fetch questions from FastAPI
+def fetch_dataframe_from_fastapi():
+    try:
+        response = requests.get(f"{FASTAPI_URL}/db/questions")
+        if response.status_code == 200:
+            return pd.DataFrame(response.json())  # Convert JSON to DataFrame
+        else:
+            st.error(f"Failed to fetch questions: {response.status_code}")
+            return pd.DataFrame()  # Return empty DataFrame on failure
+    except Exception as e:
+        st.error(f"Error fetching questions: {e}")
+        return pd.DataFrame()
+
+# Function to fetch user results from FastAPI
+def fetch_user_results_from_fastapi(user_id):
+    try:
+        response = requests.get(f"{FASTAPI_URL}/db/user_results/{user_id}")
+        if response.status_code == 200:
+            return pd.DataFrame(response.json())  # Convert JSON to DataFrame
+        else:
+            st.error(f"Failed to fetch user results: {response.status_code}")
+            return pd.DataFrame()  # Return empty DataFrame on failure
+    except Exception as e:
+        st.error(f"Error fetching user results: {e}")
+        return pd.DataFrame()
+
+# Function to update user result using FastAPI
+def update_user_result_in_fastapi(user_id, task_id, status, chatgpt_response):
+    try:
+        data = {
+            "user_id": user_id,
+            "task_id": task_id,
+            "status": status,
+            "chatgpt_response": chatgpt_response
+        }
+        response = requests.put(f"{FASTAPI_URL}/db/update_result", json=data)
+        if response.status_code == 200:
+            st.success("Result updated successfully!")
+        else:
+            st.error(f"Failed to update result:: {response.status_code}")
+    except Exception as e:
+        st.error(f"Error updating result: {e}")
+
 # Explore Questions Page
 def run_explore_questions():
+
     openai_api_key = os.getenv('OPENAI_API_KEY')
     aws_access_key = os.getenv('AWS_ACCESS_KEY')
     aws_secret_key = os.getenv('AWS_SECRET_KEY')
@@ -137,43 +187,54 @@ def run_explore_questions():
     init_openai(openai_api_key)
     s3_client = init_s3_client(aws_access_key, aws_secret_key)
 
+    # Fetch the questions from FastAPI
+    df = fetch_dataframe_from_fastapi()
 
-    # Add a "Back" button to return to the main page using a callback
-    st.button("Back", on_click=go_back_to_user_page, key="back_button")
+    # Initialize session state for pagination and instructions
+    initialize_session_state(df)
 
-    #st.title("GAIA Dataset QA with ChatGPT")
-    st.markdown("<h1 style='text-align: center;'>GAIA Dataset QA with ChatGPT</h1>", unsafe_allow_html=True)
-
+    # Fetch user-specific results from FastAPI
     user_id = st.session_state.get('user_id')
-    df = fetch_dataframe_from_sql()
-    initialize_session_state(df)    
-    user_results = fetch_user_results(user_id) # Fetch user-specific results
+    user_results = fetch_user_results_from_fastapi(user_id)
 
     # If user_results is empty, create a default DataFrame with 'user_result_status' set to 'N/A'
-    if user_results is None or user_results.empty:
+    if user_results.empty:
         user_results = pd.DataFrame({
             'task_id': st.session_state.df['task_id'],
             'user_result_status': ['N/A'] * len(st.session_state.df),
-            'chatgpt_response' : ['N/A'] * len(st.session_state.df)
+            'chatgpt_response': ['N/A'] * len(st.session_state.df)
         })
 
-    merged_df = st.session_state.df.merge(
+    # Check if both dataframes contain the 'task_id' column
+    if 'task_id' in st.session_state.df.columns and 'task_id' in user_results.columns:
+        # Merge DataFrame
+        merged_df = st.session_state.df.merge(
             user_results[['task_id', 'user_result_status', 'chatgpt_response']],
             on='task_id',
             how='left'
         )
-    
-    # After merging user_results with GaiaDataset, fill missing 'user_result_status' with 'N/A'
-    merged_df['user_result_status'] = merged_df['user_result_status'].fillna('N/A')
-    merged_df['chatgpt_response'] = merged_df['chatgpt_response'].fillna('N/A')
 
-    st.session_state.user_results = merged_df  # Store merged DataFrame in session state
+        # After merging user_results with GaiaDataset, fill missing 'user_result_status' with 'N/A'
+        merged_df['user_result_status'] = merged_df['user_result_status'].fillna('N/A')
+        merged_df['chatgpt_response'] = merged_df['chatgpt_response'].fillna('N/A')
 
-    # Reset the DataFrame index to avoid KeyError issues
-    st.session_state.df.reset_index(drop=True, inplace=True)
-    st.session_state.user_results.reset_index(drop=True, inplace=True)
-    
-    current_df = display_question_table()
+        st.session_state.user_results = merged_df  # Store merged DataFrame in session state
+
+        # Reset the DataFrame index to avoid KeyError issues
+        st.session_state.df.reset_index(drop=True, inplace=True)
+        st.session_state.user_results.reset_index(drop=True, inplace=True)
+
+        # Add a "Back" button to return to the user page using a callback
+        st.button("Back", on_click=go_back_to_user_page, key="back_button")
+        # Proceed with displaying the question table
+        current_df = display_question_table()
+
+    else:
+        st.error("Error: 'task_id' is missing in one of the datasets.")
+        if st.button("Back"):
+            go_back_to_user_page()
+
+
 
     selected_row_index = st.selectbox(
         "Select Question Index",
@@ -277,7 +338,7 @@ def run_explore_questions():
                 current_status = status  # Update current_status
 
                 # Update the user-specific status in the Azure SQL Database
-                update_user_result(user_id=user_id, task_id=selected_row['task_id'], status=status, chatgpt_response=chatgpt_response)
+                update_user_result_in_fastapi(user_id=user_id, task_id=selected_row['task_id'], status=status, chatgpt_response=chatgpt_response)
 
                  # Update show_instructions flag based on new status
                 if status in ['Correct with Instruction', 'Incorrect with Instruction', 'Incorrect without Instruction']:

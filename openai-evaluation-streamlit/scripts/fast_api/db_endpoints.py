@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Query
-from scripts.api_utils.azure_sql_utils import fetch_all_users, remove_user, promote_to_admin
+from scripts.api_utils.azure_sql_utils import fetch_all_users, remove_user, promote_to_admin, fetch_user_results, fetch_all_questions, update_user_result_in_db 
 import logging
+from pydantic import BaseModel
 
 # Initialize logging
 logger = logging.getLogger("uvicorn")
@@ -71,4 +72,78 @@ async def promote_user_to_admin(user_id: str, admin: str = Query(...)):
         raise HTTPException(
             status_code=500,
             detail="An unexpected error occurred while promoting the user."
+        )
+
+
+# Model for updating the user result
+class UpdateResultModel(BaseModel):
+    user_id: str
+    task_id: str
+    status: str
+    chatgpt_response: str
+
+# Fetch all questions
+@db_router.get("/questions", tags=["User call"])
+async def get_all_questions():
+    """
+    Fetch all questions (GAIA dataset) from the database.
+    """
+    try:
+        questions = fetch_all_questions()  # Azure SQL utils should handle conversions
+        logger.info(f"Fetched {len(questions)} questions from the database.")
+        return questions
+    except Exception as e:
+        logger.error(f"Unexpected error while fetching questions: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="An unexpected error occurred while fetching questions."
+        )
+
+# Fetch user-specific results
+@db_router.get("/user_results/{user_id}", tags=["User call"])
+async def get_user_results(user_id: str):
+    """
+    Fetch user-specific results from the database by user_id.
+    """
+    try:
+        results = fetch_user_results(user_id)  # Azure SQL utils should handle conversions
+        logger.info(f"Fetched results for user '{user_id}'.")
+        return results
+    except Exception as e:
+        logger.error(f"Unexpected error while fetching user results: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"An unexpected error occurred while fetching results for user '{user_id}'."
+        )
+
+# Update user result
+@db_router.put("/update_result", tags=["User call"])
+async def update_user_result(result_data: UpdateResultModel):
+    """
+    Update user result in the database.
+    """
+    try:
+        update_success = update_user_result_in_db(
+            result_data.user_id,
+            result_data.task_id,
+            result_data.status,
+            result_data.chatgpt_response
+        )
+        
+        if update_success:
+            logger.info(f"Updated result for user '{result_data.user_id}', task '{result_data.task_id}'.")
+            return {"message": "Result updated successfully"}
+        else: 
+            raise HTTPException(
+                status_code=400,
+                detail="Failed to update the result."
+            )
+    except HTTPException as e:
+        logger.error(f"HTTP Exception during result update: {e.detail}")
+        raise e  # Re-raise the HTTP exception
+    except Exception as e:
+        logger.error(f"Unexpected error while updating user result: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="An unexpected error occurred while updating the result."
         )

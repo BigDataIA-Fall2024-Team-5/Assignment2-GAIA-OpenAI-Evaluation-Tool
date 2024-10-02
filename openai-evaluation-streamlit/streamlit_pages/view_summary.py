@@ -1,11 +1,35 @@
+import requests
 import matplotlib.pyplot as plt
 import streamlit as st
 import pandas as pd
-from scripts.api_utils.azure_sql_utils import fetch_dataframe_from_sql, fetch_user_results
+
+# URL of your FastAPI server
+FASTAPI_BASE_URL = "http://localhost:8000"  # Update with your actual FastAPI URL
 
 def go_back_to_main():
     st.session_state.page = 'user_page'
 
+# Fetch questions (GAIA dataset) from FastAPI
+def fetch_questions_from_api():
+    try:
+        response = requests.get(f"{FASTAPI_BASE_URL}/db/questions")
+        response.raise_for_status()  # Raise an error for bad responses
+        return pd.DataFrame(response.json())  # Convert the response to a DataFrame
+    except requests.exceptions.RequestException as e:
+        st.error(f"Error fetching questions: {e}")
+        return None
+
+# Fetch user-specific results from FastAPI
+def fetch_user_results_from_api(user_id):
+    try:
+        response = requests.get(f"{FASTAPI_BASE_URL}/db/user_results/{user_id}")
+        response.raise_for_status()  # Raise an error for bad responses
+        return pd.DataFrame(response.json())  # Convert the response to a DataFrame
+    except requests.exceptions.RequestException as e:
+        st.error(f"Error fetching user results: {e}")
+        return None
+
+# Main summary page logic
 def run_summary_page(df, user_results_df):
     st.title("Summary of Results")
 
@@ -73,7 +97,7 @@ def run_summary_page(df, user_results_df):
     - **Incorrect with Instruction**: The answer remained incorrect even after providing additional instructions.
     """)
 
-# View Summary Page
+# Call the view summary function
 def run_view_summary():
     # Ensure 'user_id' is available in session state
     if not st.session_state.get('user_id'):
@@ -81,15 +105,15 @@ def run_view_summary():
         st.session_state.page = 'login'  # Redirect to login page
         return
 
-    # Fetch the main dataset (GaiaDataset)
-    df = fetch_dataframe_from_sql()
+    # Fetch the main dataset (GAIA dataset) from FastAPI
+    df = fetch_questions_from_api()
     
     # Fetch user-specific results (returns None if no results are found)
-    user_results_df = fetch_user_results(st.session_state['user_id'])
+    user_results_df = fetch_user_results_from_api(st.session_state['user_id'])
 
     # Ensure the main dataset was fetched successfully
     if df is None:
-        st.error("Failed to load the main dataset from Azure SQL.")
+        st.error("Failed to load the main dataset from FastAPI.")
         return
     
     # If user_results_df is None (no results found for the user), create an empty DataFrame
@@ -97,17 +121,5 @@ def run_view_summary():
         st.write("No user results found. Please complete some questions.")
         user_results_df = pd.DataFrame(columns=['task_id', 'user_result_status', 'chatgpt_response'])  # Empty DataFrame
 
-    # Drop 'user_result_status' from df (main dataset) to avoid duplication during the merge
-    if 'user_result_status' in df.columns:
-        df = df.drop(columns=['user_result_status'])
-
-    # Merge the two dataframes on 'task_id'
-    merged_df = df.merge(user_results_df[['task_id', 'user_result_status']], on='task_id', how='left')
-
-    # Fill missing 'user_result_status' with 'N/A'
-    merged_df['user_result_status'] = merged_df['user_result_status'].fillna('N/A')
-
-    from streamlit_pages.view_summary import run_summary_page
-
-    # Call the summary page with the merged dataframe
-    run_summary_page(merged_df, user_results_df)
+    # Call the summary page with the fetched data
+    run_summary_page(df, user_results_df)
