@@ -72,7 +72,6 @@ def display_question_table():
     return current_df
 
 # Callback function for handling 'Send to ChatGPT'
-# Callback function for handling 'Send to ChatGPT'
 def handle_send_to_chatgpt(selected_row, selected_row_index, preprocessed_data):
     user_id = st.session_state.get('user_id') 
 
@@ -130,7 +129,7 @@ def initialize_session_state(df):
     if 'final_status_updated' not in st.session_state:
         st.session_state.final_status_updated = False  # Track if the final status was updated
 
-# FastAPI URLs (replace with your actual FastAPI base URL)
+# FastAPI URLs
 FASTAPI_URL = "http://localhost:8000"
 
 # Function to fetch questions from FastAPI
