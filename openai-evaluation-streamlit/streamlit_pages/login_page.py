@@ -1,12 +1,13 @@
 import streamlit as st
-from scripts.api_utils.azure_sql_utils import fetch_user_from_sql, fetch_user_results
-import bcrypt
-import pandas as pd
+import requests
 
-# Callback function to go back to the register page
+# Define your FastAPI endpoint
+fastapi_url = "http://127.0.0.1:8000/auth/login"
+
 def go_to_register():
     st.session_state['login_success'] = False
-    st.session_state['username'] = ''
+    st.session_state['user'] = ''
+    st.session_state['username'] = ''  # Clear username as well
     st.session_state['password'] = ''
     st.session_state.page = 'register'
 
@@ -15,56 +16,60 @@ def on_login_click():
     username = st.session_state['username']
     password = st.session_state['password']
     
-    # Fetch user data from database
-    user = fetch_user_from_sql(username)
+    login_data = {"username": username, "password": password}
+
+    try:
+        with st.spinner('Logging in...'):
+            response = requests.post(fastapi_url, json=login_data)
+            
+            if response.status_code == 200:
+                result = response.json()
+                
+                # Store the retrieved values in session state
+                st.session_state['jwt_token'] = result['access_token']
+                st.session_state['user_id'] = result.get('user_id', None)
+                st.session_state['role'] = result['role'] 
+
+                st.session_state['user'] = result['username'] 
+                st.session_state['username'] = result['username']  
+                st.session_state['login_success'] = True
+                
+                st.success(f"Welcome {result['username']}!")
+                
+                # Redirect based on role
+                if result['role'] == 'admin':
+                    st.session_state.page = 'admin_page'
+                else:
+                    st.session_state.page = 'user_page'
+            
+            elif response.status_code == 404:
+                st.error("Login failed: User not found.")
+            
+            elif response.status_code == 401:
+                st.error("Login failed: Incorrect password.")
+            
+            elif response.status_code == 400:
+                st.error("Login failed: Bad request. Please check your input.")
+            
+            elif response.status_code == 500:
+                st.error("Login failed: Server error. Please try again later.")
+            
+            else:
+                st.error(f"Unexpected error: {response.status_code}")
     
-    if user:
-        stored_password = user['password'].encode('utf-8')  # Stored hashed password from DB
-        if bcrypt.checkpw(password.encode('utf-8'), stored_password):
-            # Store user info in session state
-            st.session_state['user_id'] = user['user_id']
-            st.session_state['username'] = user['username']
-            st.session_state['role'] = user['role']
-            st.session_state['login_success'] = True  # Set login_success to True
-            st.success(f"Welcome, {username}!")
+    except requests.exceptions.RequestException as e:
+        st.error(f"Login request failed: {e}")
 
-            # Fetch user-specific results after login and store in session state
-            user_results = fetch_user_results(st.session_state['user_id'])
-            if user_results is not None and not user_results.empty:
-                st.session_state['user_results'] = user_results
-            else:
-                # Initialize an empty user_results DataFrame if the user has no data yet
-                st.session_state['user_results'] = pd.DataFrame()  # Empty DataFrame for a new user
-
-            # Redirect based on role
-            if user['role'] == 'admin':
-                st.session_state.page = 'admin'  # Redirect to admin page
-            else:
-                st.session_state.page = 'main'  # Redirect to main page for regular users
-
-        else:
-            st.error("Incorrect password")
-    else:
-        st.error("Username not found")
-
+# Login page UI
 def login_page():
     st.title("Login to Your Account")
-
-    # Ensure session state variables are initialized
-    if 'login_success' not in st.session_state:
-        st.session_state['login_success'] = False
-    if 'username' not in st.session_state:
-        st.session_state['username'] = ''
-    if 'password' not in st.session_state:
-        st.session_state['password'] = ''
-
-    # Show the login form if login hasn't been successful yet
+    
+    # Display login form if login hasn't been successful yet
     if not st.session_state['login_success']:
         st.text_input("Username", key='username', value=st.session_state['username'])
         st.text_input("Password", key='password', type="password", value=st.session_state['password'])
 
-        # Login button with explicit on_click callback
+        # Trigger login when login button is clicked
         st.button("Login", on_click=on_login_click)
+        st.button("Create New Account", on_click=go_to_register, key="register_button")
 
-    # Create New Account button
-    st.button("Create New Account", on_click=go_to_register, key="register_button")
