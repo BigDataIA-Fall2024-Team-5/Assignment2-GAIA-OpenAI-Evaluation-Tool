@@ -27,14 +27,14 @@ def go_back_to_user_page():
     st.session_state.page = 'user_page'
 
     
-def display_question_table():
+def display_question_table(df):
     # Pagination controls
     col1, col2 = st.columns([9, 1])
     if col1.button("Previous", key="previous_button"):
         if st.session_state.current_page > 0:
             st.session_state.current_page -= 1
     if col2.button("Next", key="next_button"):
-        if st.session_state.current_page < (len(st.session_state.df) // 7):
+        if st.session_state.current_page < (len(df) // 7):
             st.session_state.current_page += 1
 
     # Define pagination parameters
@@ -44,7 +44,7 @@ def display_question_table():
     end_idx = start_idx + page_size
 
     # Select the current page of questions to display
-    current_df = st.session_state.user_results.iloc[start_idx:end_idx]
+    current_df = df.iloc[start_idx:end_idx]
 
     # Define styling for the table
     def style_dataframe_with_borders(df):
@@ -175,6 +175,57 @@ def update_user_result_in_fastapi(user_id, task_id, status, chatgpt_response):
     except Exception as e:
         st.error(f"Error updating result: {e}")
 
+
+# Sidebar Filters
+def add_sidebar_filters(df):
+    st.sidebar.header("Filters")
+
+    # Filter by 'Level'
+    levels = sorted(df['Level'].unique()) if 'Level' in df.columns else []
+    selected_levels = st.sidebar.multiselect(
+        "Select Levels",
+        options=levels,
+        default=levels  # By default, all levels are selected
+    )
+
+    # Filter by 'Associated File Type'
+    # Replace empty or missing file names with 'No File'
+    file_types = df['file_name'].apply(lambda x: os.path.splitext(x)[1] if pd.notna(x) and x != "" else "No File")
+    file_types = sorted(file_types.unique())
+    selected_file_types = st.sidebar.multiselect(
+        "Select File Types",
+        options=file_types,
+        default=file_types  # By default, all file types are selected
+    )
+
+    # Filter by 'User Result Status'
+    result_statuses = sorted(df['user_result_status'].unique()) if 'user_result_status' in df.columns else []
+    selected_statuses = st.sidebar.multiselect(
+        "Select User Result Status",
+        options=result_statuses,
+        default=result_statuses  # By default, all statuses are selected
+    )
+
+    return selected_levels, selected_file_types, selected_statuses
+
+
+# Function to apply the filters to the DataFrame
+def apply_filters(df, selected_levels, selected_file_types, selected_statuses):
+    # Filter by 'Level'
+    if selected_levels:
+        df = df[df['Level'].isin(selected_levels)]
+
+    # Filter by 'Associated File Type'
+    if selected_file_types:
+        df = df[df['file_name'].apply(lambda x: os.path.splitext(x)[1]).isin(selected_file_types)]
+
+    # Filter by 'User Result Status'
+    if selected_statuses:
+        df = df[df['user_result_status'].isin(selected_statuses)]
+
+    return df
+
+
 # Explore Questions Page
 def run_explore_questions():
 
@@ -205,8 +256,8 @@ def run_explore_questions():
         })
 
     # Check if both dataframes contain the 'task_id' column
+    # Merge DataFrame
     if 'task_id' in st.session_state.df.columns and 'task_id' in user_results.columns:
-        # Merge DataFrame
         merged_df = st.session_state.df.merge(
             user_results[['task_id', 'user_result_status', 'chatgpt_response']],
             on='task_id',
@@ -219,14 +270,17 @@ def run_explore_questions():
 
         st.session_state.user_results = merged_df  # Store merged DataFrame in session state
 
-        # Reset the DataFrame index to avoid KeyError issues
-        st.session_state.df.reset_index(drop=True, inplace=True)
-        st.session_state.user_results.reset_index(drop=True, inplace=True)
-
         # Add a "Back" button to return to the user page using a callback
         st.button("Back", on_click=go_back_to_user_page, key="back_button")
-        # Proceed with displaying the question table
-        current_df = display_question_table()
+
+        # Apply filters in the sidebar
+        selected_levels, selected_file_types, selected_statuses = add_sidebar_filters(st.session_state.user_results)
+
+        # Apply the selected filters to the dataframe
+        filtered_df = apply_filters(st.session_state.user_results, selected_levels, selected_file_types, selected_statuses)
+
+        # Proceed with displaying the question table based on filtered data
+        current_df = display_question_table(filtered_df)
 
     else:
         st.error("Error: 'task_id' is missing in one of the datasets.")
