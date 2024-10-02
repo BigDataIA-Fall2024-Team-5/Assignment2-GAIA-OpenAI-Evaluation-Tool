@@ -1,4 +1,4 @@
-#amazon_s3_utils
+# amazon_s3_utils.py
 import os
 import boto3
 
@@ -24,7 +24,6 @@ def find_file_in_repo(file_name, repo_dir):
 # Upload files to S3 and update paths in the DataFrame
 def upload_files_to_s3_and_update_paths(dataset, s3_client, bucket_name, repo_dir):
     """Upload files to S3 and update paths in the DataFrame."""
-    # Counters
     total_files = 0
     files_uploaded = 0
     file_paths_updated = 0
@@ -59,7 +58,6 @@ def upload_files_to_s3_and_update_paths(dataset, s3_client, bucket_name, repo_di
             else:
                 print(f"File {row['file_name']} not found in repository.")
     
-    # Print summary
     print(f"\nSummary:")
     print(f"Total rows with file names: {total_files}")
     print(f"Total files uploaded to S3: {files_uploaded}")
@@ -87,4 +85,29 @@ def download_file_from_s3(file_name, bucket_name, download_dir, s3_client):
         print(f"Error downloading {file_name} from S3: {e}")
         return None
 
+# Read PDF summary from S3
+def read_pdf_summary_from_s3(file_name, extraction_method, bucket_name, s3_client):
+    """Read a PDF summary from the appropriate S3 folder."""
+    try:
+        # Strip the '.pdf' extension from the file name if it exists
+        if file_name.endswith('.pdf'):
+            file_base_name = file_name[:-4]  # Remove the .pdf extension
+        else:
+            file_base_name = file_name
+
+        # Select the folder based on the extraction method
+        folder = "gold/textract" if extraction_method == "Amazon Textract" else "gold/pymupdf"
+        summary_file = f"{folder}/{file_base_name}.txt"  # Assuming .txt summary files exist
+
+        # Download the summary file from S3
+        obj = s3_client.get_object(Bucket=bucket_name, Key=summary_file)
+        summary = obj['Body'].read().decode('utf-8')
+        return summary
+    except s3_client.exceptions.NoSuchKey:
+        # Handle case where the summary file is not available
+        return "Not available yet. Keep posted."
+    except Exception as e:
+        # Handle any other exceptions
+        print(f"Error reading PDF summary from {extraction_method}: {e}")
+        return None
 
