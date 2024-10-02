@@ -1,32 +1,22 @@
-#explore_questions.py
+# explore_questions.py
 import os
 import streamlit as st
 import pandas as pd
 from scripts.api_utils.chatgpt_utils import get_chatgpt_response, compare_and_update_status, init_openai
-from scripts.api_utils.amazon_s3_utils import download_file_from_s3, init_s3_client
-from scripts.data_handling.file_processor import preprocess_file
-from scripts.data_handling.delete_cache import delete_cache_folder
+from scripts.api_utils.amazon_s3_utils import read_pdf_summary_from_s3, init_s3_client
 import requests
 
-
-# Define cache directory and temporary file directory
-cache_dir = '.cache'
-temp_file_dir = os.path.join(cache_dir, 'temp_file')
-
-# Ensure that cache and temp directories exist
-os.makedirs(temp_file_dir, exist_ok=True)
+# FastAPI URLs
+FASTAPI_URL = "http://localhost:8000"
 
 def go_back_to_user_page():
-    # Do not clear the session state related to user info
+    # Reset session state but keep user info
     st.session_state.show_instructions = False
     st.session_state.current_page = 0
     st.session_state.last_selected_row_index = None
     st.session_state.chatgpt_response = None 
-
-    # Navigate back to the main page without clearing username/session data
     st.session_state.page = 'user_page'
 
-    
 def display_question_table(df):
     # Pagination controls
     col1, col2 = st.columns([9, 1])
@@ -38,7 +28,7 @@ def display_question_table(df):
             st.session_state.current_page += 1
 
     # Define pagination parameters
-    page_size = 9  # Number of questions per page
+    page_size = 9
     current_page = st.session_state.current_page
     start_idx = current_page * page_size
     end_idx = start_idx + page_size
@@ -46,7 +36,7 @@ def display_question_table(df):
     # Select the current page of questions to display
     current_df = df.iloc[start_idx:end_idx]
 
-    # Define styling for the table
+    # Style the table for display
     def style_dataframe_with_borders(df):
         return df.style.set_table_styles(
             [{
@@ -61,17 +51,60 @@ def display_question_table(df):
             }]
         )
 
-    # Filter the dataframe to show only the 'Question, Level' column
-    question_df = current_df[['Question','Level']]
+    # Filter to show only the 'Question' and 'Level' columns
+    question_df = current_df[['Question', 'Level']]
     question_df.index.name = 'ID'
     styled_df = style_dataframe_with_borders(question_df)
 
-    # Display the styled dataframe in Streamlit
+    # Display the styled table in Streamlit
     st.dataframe(styled_df, use_container_width=True)
 
     return current_df
 
-# Callback function for handling 'Send to ChatGPT'
+# Fetch questions from FastAPI
+def fetch_dataframe_from_fastapi():
+    try:
+        response = requests.get(f"{FASTAPI_URL}/db/questions")
+        if response.status_code == 200:
+            return pd.DataFrame(response.json())  # Convert JSON to DataFrame
+        else:
+            st.error(f"Failed to fetch questions: {response.status_code}")
+            return pd.DataFrame()  # Return empty DataFrame on failure
+    except Exception as e:
+        st.error(f"Error fetching questions: {e}")
+        return pd.DataFrame()
+
+# Fetch user results from FastAPI
+def fetch_user_results_from_fastapi(user_id):
+    try:
+        response = requests.get(f"{FASTAPI_URL}/db/user_results/{user_id}")
+        if response.status_code == 200:
+            return pd.DataFrame(response.json())  # Convert JSON to DataFrame
+        else:
+            st.error(f"Failed to fetch user results: {response.status_code}")
+            return pd.DataFrame()  # Return empty DataFrame on failure
+    except Exception as e:
+        st.error(f"Error fetching user results: {e}")
+        return pd.DataFrame()
+
+# Update user result using FastAPI
+def update_user_result_in_fastapi(user_id, task_id, status, chatgpt_response):
+    try:
+        data = {
+            "user_id": user_id,
+            "task_id": task_id,
+            "status": status,
+            "chatgpt_response": chatgpt_response
+        }
+        response = requests.put(f"{FASTAPI_URL}/db/update_result", json=data)
+        if response.status_code == 200:
+            st.success("Result updated successfully!")
+        else:
+            st.error(f"Failed to update result: {response.status_code}")
+    except Exception as e:
+        st.error(f"Error updating result: {e}")
+
+    # Callback function for handling 'Send to ChatGPT'
 def handle_send_to_chatgpt(selected_row, selected_row_index, preprocessed_data):
     user_id = st.session_state.get('user_id') 
 
@@ -129,52 +162,6 @@ def initialize_session_state(df):
     if 'final_status_updated' not in st.session_state:
         st.session_state.final_status_updated = False  # Track if the final status was updated
 
-# FastAPI URLs
-FASTAPI_URL = "http://localhost:8000"
-
-# Function to fetch questions from FastAPI
-def fetch_dataframe_from_fastapi():
-    try:
-        response = requests.get(f"{FASTAPI_URL}/db/questions")
-        if response.status_code == 200:
-            return pd.DataFrame(response.json())  # Convert JSON to DataFrame
-        else:
-            st.error(f"Failed to fetch questions: {response.status_code}")
-            return pd.DataFrame()  # Return empty DataFrame on failure
-    except Exception as e:
-        st.error(f"Error fetching questions: {e}")
-        return pd.DataFrame()
-
-# Function to fetch user results from FastAPI
-def fetch_user_results_from_fastapi(user_id):
-    try:
-        response = requests.get(f"{FASTAPI_URL}/db/user_results/{user_id}")
-        if response.status_code == 200:
-            return pd.DataFrame(response.json())  # Convert JSON to DataFrame
-        else:
-            st.error(f"Failed to fetch user results: {response.status_code}")
-            return pd.DataFrame()  # Return empty DataFrame on failure
-    except Exception as e:
-        st.error(f"Error fetching user results: {e}")
-        return pd.DataFrame()
-
-# Function to update user result using FastAPI
-def update_user_result_in_fastapi(user_id, task_id, status, chatgpt_response):
-    try:
-        data = {
-            "user_id": user_id,
-            "task_id": task_id,
-            "status": status,
-            "chatgpt_response": chatgpt_response
-        }
-        response = requests.put(f"{FASTAPI_URL}/db/update_result", json=data)
-        if response.status_code == 200:
-            st.success("Result updated successfully!")
-        else:
-            st.error(f"Failed to update result:: {response.status_code}")
-    except Exception as e:
-        st.error(f"Error updating result: {e}")
-
 
 # Sidebar Filters
 def add_sidebar_filters(df):
@@ -185,7 +172,7 @@ def add_sidebar_filters(df):
     selected_levels = st.sidebar.multiselect(
         "Select Levels",
         options=levels,
-        default=levels  # By default, all levels are selected
+        default=[]
     )
 
     # Filter by 'Associated File Type'
@@ -195,7 +182,7 @@ def add_sidebar_filters(df):
     selected_file_types = st.sidebar.multiselect(
         "Select File Types",
         options=file_types,
-        default=file_types  # By default, all file types are selected
+        default=[] 
     )
 
     # Filter by 'User Result Status'
@@ -203,11 +190,10 @@ def add_sidebar_filters(df):
     selected_statuses = st.sidebar.multiselect(
         "Select User Result Status",
         options=result_statuses,
-        default=result_statuses  # By default, all statuses are selected
+        default=[] 
     )
 
     return selected_levels, selected_file_types, selected_statuses
-
 
 # Function to apply the filters to the DataFrame
 def apply_filters(df, selected_levels, selected_file_types, selected_statuses):
@@ -224,7 +210,6 @@ def apply_filters(df, selected_levels, selected_file_types, selected_statuses):
         df = df[df['user_result_status'].isin(selected_statuses)]
 
     return df
-
 
 # Explore Questions Page
 def run_explore_questions():
@@ -296,6 +281,7 @@ def run_explore_questions():
         key=f"selectbox_{st.session_state.current_page}"
     )
 
+    # Selected row from the table
     selected_row = current_df.loc[selected_row_index]
     st.write("**Question:**", selected_row['Question'])
     st.write("**Expected Final Answer:**", selected_row['FinalAnswer'])
@@ -307,44 +293,46 @@ def run_explore_questions():
     # Get the file name and file path (S3 URL) if available
     file_name = selected_row.get('file_name', None)
     file_url = selected_row.get('file_path', None)
-    downloaded_file_path = None
     preprocessed_data = None
 
-    if file_name:
-        st.write(f"**File Name:** {file_name}")
-        if file_url:
-            st.write(f"**File Path (URL):** {file_url}")
+    # Handle PDF file types and unsupported files
+    file_extension = os.path.splitext(file_name)[1].lower() if file_name else None
+    show_chatgpt_button = False  # Flag to control whether the "Send to ChatGPT" button is shown
 
-        file_extension = os.path.splitext(file_name)[1].lower()
-        unsupported_types = ['.jpg', '.png', '.zip', '.mp3']
+    if file_extension == '.pdf':
+        st.write("**File Type:** PDF")
 
-        if file_extension in unsupported_types:
-            st.error(f"File type '{file_extension}' is currently not supported")
-        else:
-            if bucket_name:
-                downloaded_file_path = download_file_from_s3(file_name, bucket_name, temp_file_dir, s3_client)
+        # Let the user select the extraction method (PyMuPDF or Amazon Textract)
+        extraction_method = st.radio(
+            "Choose PDF extraction method:",
+            ("PyMuPDF", "Amazon Textract"),
+            index=0
+        )
 
-                if downloaded_file_path:
-                    st.write(f"File downloaded successfully to: {downloaded_file_path}")
-                    preprocessed_data = preprocess_file(downloaded_file_path)
-                    if isinstance(preprocessed_data, str) and "not supported" in preprocessed_data:
-                        st.error(preprocessed_data)
-                else:
-                    st.error(f"Failed to download the file {file_name} from S3.")
-            else:
-                st.error(f"Invalid bucket name: {bucket_name}. Please check the environment variables.")
+        # Fetch the PDF summary from S3
+        pdf_summary = read_pdf_summary_from_s3(file_name, extraction_method, bucket_name, s3_client)
+        if pdf_summary:
+            st.write(f"**PDF Summary ({extraction_method}):**")
+            st.write(pdf_summary)
+            preprocessed_data = pdf_summary  # Use this data for sending to ChatGPT
+            show_chatgpt_button = True  # Allow ChatGPT button for PDF
     else:
-        st.info("No file associated with this question.")
+        if file_extension:
+            st.error(f"Unsupported file type: {file_extension}")
+            show_chatgpt_button = False  # Disable ChatGPT button for unsupported files
+        else:
+            st.info("No file associated with this question.")
+            preprocessed_data = None  # No file, but we can still send the question to ChatGPT
+            show_chatgpt_button = True  # Allow ChatGPT button for questions with no file
 
     # Update session state for instructions when selecting a new question
     if 'last_selected_row_index' not in st.session_state or st.session_state.last_selected_row_index != selected_row_index:
         # Conditions to show the Edit Instructions box:
-        # Show instructions if the result is 'Correct with Instructions', 'Incorrect with Instructions', or 'Incorrect without Instructions'
+        # Show instructions if the result is 'Correct with Instructions', 'Incorrect with Instructions', or 'Incorrect without Instruction'
         if current_status in ['Correct with Instruction', 'Incorrect with Instruction', 'Incorrect without Instruction']:
             st.session_state.instructions = selected_row.get('Annotator_Metadata_Steps', '')  # Pre-fill from dataset
             st.session_state.show_instructions = True  # Show the instructions box
         else:
-            #st.session_state.instructions = ""  # Clear instructions
             st.session_state.instructions = selected_row.get('Annotator_Metadata_Steps', '')
             st.session_state.show_instructions = False  # Hide instructions by default
 
@@ -355,12 +343,14 @@ def run_explore_questions():
     if st.session_state.chatgpt_response:
         st.write(f"**ChatGPT's Response:** {st.session_state.chatgpt_response}")
 
-    # Only display the button if the status is not "Correct with Instruction"
-    if not st.session_state.show_instructions and current_status != "Correct with Instruction":
-        # Show 'Send to ChatGPT' if the status is not 'Correct with Instruction'
+    # Show "Send to ChatGPT" button only if the file type is valid or no file is associated
+    if show_chatgpt_button and not st.session_state.show_instructions and current_status != "Correct with Instruction":
         if st.button("Send to ChatGPT", on_click=handle_send_to_chatgpt, args=(selected_row, selected_row_index, preprocessed_data), key=f"send_chatgpt_{selected_row_index}"):
             # ChatGPT response will be processed in handle_send_to_chatgpt
             pass
+    else:
+        # If we don't show the main button, show it as disabled (for unsupported files)
+        st.button("Send to ChatGPT", disabled=True, key=f"disabled_chatgpt_{selected_row_index}")
 
     # If the response was incorrect, prompt for instructions
     if st.session_state.show_instructions:
@@ -393,7 +383,7 @@ def run_explore_questions():
                 # Update the user-specific status in the Azure SQL Database
                 update_user_result_in_fastapi(user_id=user_id, task_id=selected_row['task_id'], status=status, chatgpt_response=chatgpt_response)
 
-                 # Update show_instructions flag based on new status
+                # Update show_instructions flag based on new status
                 if status in ['Correct with Instruction', 'Incorrect with Instruction', 'Incorrect without Instruction']:
                     st.session_state.show_instructions = True
                 else:
@@ -415,10 +405,6 @@ def run_explore_questions():
     # Get the background color based on the Final Result Status
     background_style = style_status_based_on_final_result(current_status)
 
-   # Apply the same background color style to both "Final Result Status" and "Latest ChatGPT Response"
+    # Apply the same background color style to both "Final Result Status" and "Latest ChatGPT Response"
     st.markdown(f'<div style="{background_style}"><strong>Final Result Status:</strong> {current_status}</div>', unsafe_allow_html=True)
     st.markdown(f'<div style="{background_style}"><strong>Latest ChatGPT Response:</strong> {chatgpt_response}</div>', unsafe_allow_html=True)
-
-    # Cleanup: Delete cache folder after processing if a file was downloaded
-    # if downloaded_file_path:
-    #     delete_cache_folder(temp_file_dir)  # Cleanup the temp directory after the process is done
