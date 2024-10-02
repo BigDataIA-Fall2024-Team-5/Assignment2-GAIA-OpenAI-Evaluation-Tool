@@ -1,19 +1,37 @@
 from fastapi import APIRouter, HTTPException
-from scripts.api_utils.amazon_s3_utils import init_s3_client, upload_files_to_s3_and_update_paths
-import os
+from pydantic import BaseModel
+from scripts.api_utils.amazon_s3_utils import read_pdf_summary_from_s3, get_s3_client
+import logging
 
 s3_router = APIRouter()
 
-@s3_router.post("/upload")
-async def upload_files(dataset: dict):
-    access_key = os.getenv('AWS_ACCESS_KEY')
-    secret_key = os.getenv('AWS_SECRET_KEY')
-    bucket_name = os.getenv('S3_BUCKET_NAME')
-    s3_client = init_s3_client(access_key, secret_key)
+# Configure a logger
+logger = logging.getLogger("uvicorn")
 
-    repo_dir = "/path/to/repo"
-    updated_dataset = upload_files_to_s3_and_update_paths(dataset, s3_client, bucket_name, repo_dir)
+# Pydantic model for the request
+class FetchPDFSummaryRequest(BaseModel):
+    file_name: str
+    extraction_method: str
 
-    if updated_dataset:
-        return {"message": "Files uploaded and dataset updated"}
-    raise HTTPException(status_code=500, detail="Error uploading files")
+# Fetch PDF summary from S3
+@s3_router.post("/fetch_pdf_summary/")
+def fetch_pdf_summary(request: FetchPDFSummaryRequest):
+    try:
+        # Use the S3 client from amazon_s3_utils
+        s3_client_instance = get_s3_client()
+
+        summary = read_pdf_summary_from_s3(
+            file_name=request.file_name,
+            extraction_method=request.extraction_method,
+            bucket_name=s3_client_instance.bucket_name,
+            s3_client=s3_client_instance.client
+        )
+        
+        if summary:
+            return {"summary": summary}
+        else:
+            raise HTTPException(status_code=404, detail="PDF summary not available.")
+    except Exception as e:
+        # Log the actual error message
+        logger.error(f"Error fetching PDF summary: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")

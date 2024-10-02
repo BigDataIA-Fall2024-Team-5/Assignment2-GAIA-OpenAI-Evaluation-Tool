@@ -79,13 +79,18 @@ def fetch_user_results_from_fastapi(user_id):
     try:
         response = requests.get(f"{FASTAPI_URL}/db/user_results/{user_id}")
         if response.status_code == 200:
-            return pd.DataFrame(response.json())  # Convert JSON to DataFrame
+            json_data = response.json()
+            if json_data:  # Check if the response JSON is not empty
+                return pd.DataFrame(json_data)  # Convert JSON to DataFrame
+            else:
+                return pd.DataFrame()  # Return empty DataFrame if no data
         else:
             st.error(f"Failed to fetch user results: {response.status_code}")
             return pd.DataFrame()  # Return empty DataFrame on failure
     except Exception as e:
         st.error(f"Error fetching user results: {e}")
-        return pd.DataFrame()
+        return pd.DataFrame()  # Return empty DataFrame on exception
+
 
 # Update user result using FastAPI
 def update_user_result_in_fastapi(user_id, task_id, status, chatgpt_response):
@@ -104,7 +109,24 @@ def update_user_result_in_fastapi(user_id, task_id, status, chatgpt_response):
     except Exception as e:
         st.error(f"Error updating result: {e}")
 
-    # Callback function for handling 'Send to ChatGPT'
+# Fetch PDF summary from FastAPI
+def fetch_pdf_summary_from_fastapi(file_name, extraction_method):
+    try:
+        data = {
+            "file_name": file_name,
+            "extraction_method": extraction_method
+        }
+        response = requests.post(f"{FASTAPI_URL}/s3/fetch_pdf_summary/", json=data)
+        if response.status_code == 200:
+            return response.json().get('summary', None)
+        else:
+            st.error(f"Failed to fetch PDF summary: {response.status_code}")
+            return None
+    except Exception as e:
+        st.error(f"Error fetching PDF summary: {e}")
+        return None
+
+# Callback function for handling 'Send to ChatGPT'
 def handle_send_to_chatgpt(selected_row, selected_row_index, preprocessed_data):
     user_id = st.session_state.get('user_id') 
 
@@ -165,6 +187,7 @@ def initialize_session_state(df):
 
 # Sidebar Filters
 def add_sidebar_filters(df):
+
     st.sidebar.header("Filters")
 
     # Filter by 'Level'
@@ -232,8 +255,8 @@ def run_explore_questions():
     user_id = st.session_state.get('user_id')
     user_results = fetch_user_results_from_fastapi(user_id)
 
-    # If user_results is empty, create a default DataFrame with 'user_result_status' set to 'N/A'
-    if user_results.empty:
+    # Check if user_results is empty
+    if user_results is None or user_results.empty:
         user_results = pd.DataFrame({
             'task_id': st.session_state.df['task_id'],
             'user_result_status': ['N/A'] * len(st.session_state.df),
@@ -255,8 +278,8 @@ def run_explore_questions():
 
         st.session_state.user_results = merged_df  # Store merged DataFrame in session state
 
-        # Add a "Back" button to return to the user page using a callback
-        st.button("Back", on_click=go_back_to_user_page, key="back_button")
+        # Add a "Back" button to return to the user page in the sidebar using a callback
+        st.sidebar.button("Back to Home Page", on_click=go_back_to_user_page, key="back_button_sidebar")
 
         # Apply filters in the sidebar
         selected_levels, selected_file_types, selected_statuses = add_sidebar_filters(st.session_state.user_results)
@@ -299,6 +322,7 @@ def run_explore_questions():
     file_extension = os.path.splitext(file_name)[1].lower() if file_name else None
     show_chatgpt_button = False  # Flag to control whether the "Send to ChatGPT" button is shown
 
+    # Fetch the PDF summary and display options
     if file_extension == '.pdf':
         st.write("**File Type:** PDF")
 
@@ -309,8 +333,8 @@ def run_explore_questions():
             index=0
         )
 
-        # Fetch the PDF summary from S3
-        pdf_summary = read_pdf_summary_from_s3(file_name, extraction_method, bucket_name, s3_client)
+        # Fetch the PDF summary from FastAPI
+        pdf_summary = fetch_pdf_summary_from_fastapi(file_name, extraction_method)
         if pdf_summary:
             st.write(f"**PDF Summary ({extraction_method}):**")
             st.write(pdf_summary)
@@ -321,7 +345,6 @@ def run_explore_questions():
             st.error(f"Unsupported file type: {file_extension}")
             show_chatgpt_button = False  # Disable ChatGPT button for unsupported files
         else:
-            st.info("No file associated with this question.")
             preprocessed_data = None  # No file, but we can still send the question to ChatGPT
             show_chatgpt_button = True  # Allow ChatGPT button for questions with no file
 
@@ -343,17 +366,15 @@ def run_explore_questions():
     if st.session_state.chatgpt_response:
         st.write(f"**ChatGPT's Response:** {st.session_state.chatgpt_response}")
 
-    # Show "Send to ChatGPT" button only if the file type is valid or no file is associated
-    if show_chatgpt_button and not st.session_state.show_instructions and current_status != "Correct with Instruction":
-        if st.button("Send to ChatGPT", on_click=handle_send_to_chatgpt, args=(selected_row, selected_row_index, preprocessed_data), key=f"send_chatgpt_{selected_row_index}"):
-            # ChatGPT response will be processed in handle_send_to_chatgpt
-            pass
+    # Conditionally show either "Send to ChatGPT" button or "Send to ChatGPT with Instructions" button
+    if not st.session_state.show_instructions and current_status != "Correct with Instruction":
+        # Show "Send to ChatGPT" button if no instructions are required
+        if show_chatgpt_button:
+            if st.button("Send to ChatGPT", on_click=handle_send_to_chatgpt, args=(selected_row, selected_row_index, preprocessed_data), key=f"send_chatgpt_{selected_row_index}"):
+                # ChatGPT response will be processed in handle_send_to_chatgpt
+                pass
     else:
-        # If we don't show the main button, show it as disabled (for unsupported files)
-        st.button("Send to ChatGPT", disabled=True, key=f"disabled_chatgpt_{selected_row_index}")
-
-    # If the response was incorrect, prompt for instructions
-    if st.session_state.show_instructions:
+        # If the response was incorrect, prompt for instructions and show "Send to ChatGPT with Instructions"
         st.write("**The response was incorrect. Please provide instructions.**")
 
         # Pre-fill instructions from the dataset or previous inputs
@@ -363,8 +384,8 @@ def run_explore_questions():
             key=f"instructions_{selected_row_index}"  # Unique key for each question
         )
 
-        # Button to send instructions to ChatGPT
-        if st.button("Send Instructions to ChatGPT", key=f'send_button_{selected_row_index}'):
+        # Show "Send to ChatGPT with Instructions" button instead
+        if st.button("Send to ChatGPT with Instructions", key=f'send_button_{selected_row_index}'):
             # Use the updated instructions to query ChatGPT
             chatgpt_response = get_chatgpt_response(
                 selected_row['Question'], 
