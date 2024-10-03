@@ -1,8 +1,8 @@
 import logging
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
-from scripts.fast_api.jwt_handler import create_access_token, hash_password, verify_password, validate_password_strength
-from scripts.api_utils.azure_sql_utils import fetch_user_from_sql, insert_user_to_sql
+from backend.fast_api.jwt_handler import create_access_token, hash_password, verify_password, validate_password_strength
+from backend.api_utils.azure_sql_utils import fetch_user_from_sql, insert_user_to_sql
 
 # Initialize logging
 logger = logging.getLogger("uvicorn")

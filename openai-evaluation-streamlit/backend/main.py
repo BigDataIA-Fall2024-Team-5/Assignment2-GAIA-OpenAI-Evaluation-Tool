@@ -1,17 +1,17 @@
 import os
 import sys
 from dotenv import load_dotenv
-from scripts.data_handling.clone_repo import clone_repository
-from scripts.data_handling.load_dataset import load_gaia_dataset
-from scripts.api_utils.amazon_s3_utils import init_s3_client, upload_files_to_s3_and_update_paths
+from backend.data_handling.clone_repo import clone_repository
+from backend.data_handling.load_dataset import load_gaia_dataset
+from backend.api_utils.amazon_s3_utils import init_s3_client, upload_files_to_s3_and_update_paths
 from huggingface_hub import login
-from scripts.api_utils.azure_sql_utils import insert_dataframe_to_sql, set_sqlalchemy_connection_params  # Import the setter function
+from backend.api_utils.azure_sql_utils import insert_dataframe_to_sql, set_sqlalchemy_connection_params  # Import the setter function
 from datetime import datetime
-from scripts.data_handling.delete_cache import delete_cache_folder
+from backend.data_handling.delete_cache import delete_cache_folder
 
 # Load environment variables from .env file
 load_dotenv()
-#TO RUN IN COMMAND LINE USE python -m scripts.main inside poetry shell
+#TO RUN IN COMMAND LINE USE python -m backend.main inside poetry shell
 def process_dataset():
     try:
         # Set the environment variable for Hugging Face cache directory

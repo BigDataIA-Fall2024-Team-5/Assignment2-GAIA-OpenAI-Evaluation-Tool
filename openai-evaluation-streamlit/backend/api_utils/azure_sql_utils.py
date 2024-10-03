@@ -1,5 +1,4 @@
 import pandas as pd
-from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 from sqlalchemy.types import NVARCHAR, Integer, DateTime
 from sqlalchemy.exc import SQLAlchemyError, OperationalError
@@ -70,6 +69,8 @@ def insert_dataframe_to_sql(df, table_name):
             'result_status': NVARCHAR(length=50),
             'created_date': DateTime
         })
+
+        print("Data inserted successfuly to Azure SQL")
 
     except SQLAlchemyError as e:
         raise RuntimeError(f"SQLAlchemy error during data insertion: {e}")

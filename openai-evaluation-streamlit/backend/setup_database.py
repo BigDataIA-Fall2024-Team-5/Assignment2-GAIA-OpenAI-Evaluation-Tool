@@ -2,7 +2,7 @@ import os
 import bcrypt  # To hash the passwords
 from sqlalchemy import create_engine, text
 from dotenv import load_dotenv
-from api_utils.azure_sql_utils import get_sqlalchemy_connection_string
+from backend.api_utils.azure_sql_utils import get_sqlalchemy_connection_string, set_sqlalchemy_connection_params
 
 # Load environment variables from .env file
 load_dotenv()
@@ -39,6 +39,18 @@ default_users = [
 ]
 
 def setup_database():
+
+        # Get Azure SQL connection environment variables
+    azure_sql_params = {
+        "server": os.getenv('AZURE_SQL_SERVER'),
+        "user": os.getenv('AZURE_SQL_USER'),
+        "password": os.getenv('AZURE_SQL_PASSWORD'),
+        "database": os.getenv('AZURE_SQL_DATABASE')
+    }
+
+        # Set the connection parameters for Azure SQL
+    set_sqlalchemy_connection_params(azure_sql_params)  # Ensure the connection parameters are set
+
     connection_string = get_sqlalchemy_connection_string()
     engine = create_engine(connection_string)
 

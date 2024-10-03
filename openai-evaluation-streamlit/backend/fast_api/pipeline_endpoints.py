@@ -1,8 +1,8 @@
 from fastapi import APIRouter, HTTPException, Depends
-from scripts.main import process_dataset
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, ExpiredSignatureError
-from scripts.fast_api.jwt_handler import decode_token
+from backend.fast_api.jwt_handler import decode_token
+from backend.main import process_dataset
 import logging
 
 # Create the router for pipeline-related operations
