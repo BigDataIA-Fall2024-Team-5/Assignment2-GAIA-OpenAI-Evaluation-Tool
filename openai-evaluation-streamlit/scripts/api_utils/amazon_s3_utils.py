@@ -56,47 +56,55 @@ def get_s3_client():
         raise Exception("S3 client not initialized.")
     return s3_client_instance
 
-# Find a file by name in the repository
 def find_file_in_repo(file_name, repo_dir):
-    search_path = os.path.join(repo_dir, "2023", "validation", file_name)
+    for folder in ['test', 'validation']:
+        search_path = os.path.join(repo_dir, '2023', folder, file_name)
+        if os.path.exists(search_path):
+            print(f"File {file_name} found at {search_path}")
+            return search_path, folder
+    # If not found in test or validation, search directly in 2023 folder
+    search_path = os.path.join(repo_dir, '2023', file_name)
     if os.path.exists(search_path):
         print(f"File {file_name} found at {search_path}")
-        return search_path
-    else:
-        print(f"File {file_name} not found in {search_path}")
-        return None
+        return search_path, "direct"
+    print(f"File {file_name} not found in {repo_dir}")
+    return None, None
 
 # Upload files to S3 and update paths in the DataFrame
 def upload_files_to_s3_and_update_paths(dataset, s3_client, bucket_name, repo_dir):
     total_files = 0
     files_uploaded = 0
     file_paths_updated = 0
-    uploaded_file_types = set()  # Set to keep track of uploaded file types
+    uploaded_file_types = set()
+    pdf_files_uploaded = 0  # New counter for PDF files
 
-    s3_folder = "bronze/"
+    s3_folder_all = "bronze/"
+    s3_folder_pdf_test = "pdf/test/"
+    s3_folder_pdf_validation = "pdf/validation/"
 
     for index, row in dataset.iterrows():
         if 'file_name' in row and row['file_name']:
-            total_files += 1  # Increment total file name counter
+            total_files += 1
 
-            # Find the file in the repository
-            local_file_path = find_file_in_repo(row['file_name'], repo_dir)
+            local_file_path, folder = find_file_in_repo(row['file_name'], repo_dir)
             if local_file_path:
-                # Define the S3 key, which includes the folder and the file name
+                file_extension = os.path.splitext(row['file_name'])[1].lower()
+                
+                if file_extension == '.pdf':
+                    s3_folder = s3_folder_pdf_test if folder == 'test' else s3_folder_pdf_validation
+                    pdf_files_uploaded += 1  # Increment PDF counter
+                else:
+                    s3_folder = s3_folder_all
+
                 s3_key = f"{s3_folder}{row['file_name']}"
 
-                # Upload to S3 (will overwrite if the file already exists)
                 try:
                     s3_client.upload_file(local_file_path, bucket_name, s3_key)
-                    # Update file path to S3 URL
                     dataset.at[index, 'file_path'] = f"https://{bucket_name}.s3.amazonaws.com/{s3_key}"
-                    print(f"Uploaded {row['file_name']} to S3 (overwritten if already existed) under {s3_folder}.")
-                    files_uploaded += 1  # Increment files uploaded counter
-                    file_paths_updated += 1  # Increment file paths updated counter
-
-                    # Add the file type to the set
-                    file_extension = os.path.splitext(row['file_name'])[1].lower()
-                    uploaded_file_types.add(file_extension)  # Track unique file types
+                    print(f"Uploaded {row['file_name']} to S3 under {s3_folder}.")
+                    files_uploaded += 1
+                    file_paths_updated += 1
+                    uploaded_file_types.add(file_extension)
                 except Exception as e:
                     print(f"Error uploading {row['file_name']} to S3: {e}")
             else:
@@ -105,8 +113,9 @@ def upload_files_to_s3_and_update_paths(dataset, s3_client, bucket_name, repo_di
     print(f"\nSummary:")
     print(f"Total rows with file names: {total_files}")
     print(f"Total files uploaded to S3: {files_uploaded}")
+    print(f"Total PDF files uploaded: {pdf_files_uploaded}")  # New summary line
     print(f"Total file paths updated in DataFrame: {file_paths_updated}")
-    print(f"Uploaded file types: {', '.join(uploaded_file_types)}") 
+    print(f"Uploaded file types: {', '.join(uploaded_file_types)}")
 
     return dataset
 
