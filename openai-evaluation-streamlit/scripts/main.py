@@ -10,8 +10,8 @@ from data_handling.load_dataset import load_gaia_dataset
 from api_utils.amazon_s3_utils import init_s3_client, upload_files_to_s3_and_update_paths
 from huggingface_hub import login
 from api_utils.azure_sql_utils import insert_dataframe_to_sql
-from datetime import datetime  # Import datetime for created_date
-from data_handling.delete_cache import delete_cache_folder  # Import the function to delete cache
+from datetime import datetime
+from data_handling.delete_cache import delete_cache_folder
 
 # Load environment variables from .env file
 load_dotenv()
@@ -62,10 +62,10 @@ def process_dataset():
             insert_dataframe_to_sql(df, table_name)
 
             # Step 6: Save the updated DataFrame to a new CSV file
-            output_dir = os.path.join(cache_dir, 'data_to_azuresql')
-            os.makedirs(output_dir, exist_ok=True)
-            output_csv_file = os.path.join(output_dir, 'gaia_data_view.csv')
-            df.to_csv(output_csv_file, index=False)
+            #output_dir = os.path.join(cache_dir, 'data_to_azuresql')
+            #os.makedirs(output_dir, exist_ok=True)
+            #output_csv_file = os.path.join(output_dir, 'gaia_data_view.csv')
+            #df.to_csv(output_csv_file, index=False)
 
             # Optional: Step 7: Delete the cache directory
             # delete_cache_folder(cache_dir)

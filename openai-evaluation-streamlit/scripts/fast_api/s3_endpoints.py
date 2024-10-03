@@ -27,7 +27,6 @@ async def fetch_pdf_summary(request: FetchPDFSummaryRequest, token: str = Depend
         
         # Decode and verify the JWT token
         payload = decode_token(token)
-        logger.info(f"Token decoded successfully: {payload}")
         
         # Use the S3 client from amazon_s3_utils
         s3_client_instance = get_s3_client()

@@ -4,11 +4,32 @@ import requests
 # FastAPI base URL
 fastapi_url = "http://127.0.0.1:8000/pipeline/process-dataset"
 
-# Callback to trigger dataset processing logic
+def go_to_login_page():
+    # Clear all session state keys except 'page'
+    for key in list(st.session_state.keys()):
+        if key != 'page': 
+            del st.session_state[key]
+    
+    # Set the page to login page
+    st.session_state.page = 'login'
+
+
+# Callback to trigger dataset processing logic with JWT authentication
 def run_dataset_processing():
     try:
+        # Retrieve the JWT token from session state
+        token = st.session_state.get('jwt_token')
+        if not token:
+            st.error("No JWT token found. Please log in first.")
+            return
+        
+        # Set up the headers with the JWT token
+        headers = {
+            "Authorization": f"Bearer {token}"
+        }
+
         # Send POST request to FastAPI to start dataset processing
-        response = requests.post(fastapi_url)
+        response = requests.post(fastapi_url, headers=headers)
 
         # Check if the request was successful
         if response.status_code == 200:
@@ -16,6 +37,11 @@ def run_dataset_processing():
             # Store the result in session state for display
             st.session_state['dataset_processing_status'] = "Dataset Processing Complete"
             st.session_state['dataset_processing_output'] = result['message']
+        elif response.status_code == 401:
+            # Handle unauthorized access (JWT token issues)
+            st.session_state['dataset_processing_status'] = "Unauthorized access. Please log in again."
+            # Add a button to redirect to the login page
+            st.button("Go to Login Page", on_click=go_to_login_page)
         else:
             st.session_state['dataset_processing_status'] = f"Error: {response.status_code} - {response.text}"
 
