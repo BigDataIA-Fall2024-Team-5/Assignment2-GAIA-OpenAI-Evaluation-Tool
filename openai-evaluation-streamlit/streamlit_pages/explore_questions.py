@@ -110,11 +110,29 @@ def update_user_result_in_fastapi(user_id, task_id, status, chatgpt_response):
 # Fetch PDF summary from FastAPI
 def fetch_pdf_summary_from_fastapi(file_name, extraction_method):
     try:
+        # Retrieve the token from session state
+        token = st.session_state.get('jwt_token')
+        if not token:
+            st.error("No JWT token found. Please log in.")
+            return None
+        
         data = {
             "file_name": file_name,
             "extraction_method": extraction_method
         }
-        response = requests.post(f"{FASTAPI_URL}/s3/fetch_pdf_summary/", json=data)
+        
+        # Add the token to the Authorization header
+        headers = {
+            "Authorization": f"Bearer {token}"
+        }
+        
+        response = requests.post(f"{FASTAPI_URL}/s3/fetch_pdf_summary/", json=data, headers=headers)
+        
+        # Check if the response is 401 Unauthorized (invalid or expired token)
+        if response.status_code == 401:
+            st.error("Invalid or expired token. Please log in again.")
+            return None
+        
         if response.status_code == 200:
             return response.json().get('summary', None)
         else:
