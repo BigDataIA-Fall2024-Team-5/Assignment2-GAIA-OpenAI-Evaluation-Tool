@@ -22,7 +22,31 @@ def go_to_login_page():
     
     # Set the page to login page
     st.session_state.page = 'login'
-  
+
+# Helper function to get JWT headers
+def get_jwt_headers():
+    token = st.session_state.get('jwt_token')
+    if not token:
+        st.error("No JWT token found. Please log in.")
+        return None
+    headers = {
+        "Authorization": f"Bearer {token}"
+    }
+    return headers
+
+# Helper function to handle API responses
+def handle_api_response(response, success_message=None):
+    if response.status_code == 401:
+        st.error(response.json().get('detail', "Authentication error. Please log in again."))
+        st.button("Go to Login Page", on_click=go_to_login_page)
+        return None
+    elif response.status_code == 200:
+        if success_message:
+            st.success(success_message)
+        return response.json()
+    else:
+        st.error(f"API call failed: {response.status_code}")
+        return None  
 
 def display_question_table(df):
     # Pagination controls
@@ -71,75 +95,48 @@ def display_question_table(df):
 # Fetch questions from FastAPI 
 def fetch_questions_from_fastapi():
     try:
-        # Retrieve the token from session state
-        token = st.session_state.get('jwt_token')
+        headers = get_jwt_headers()
+        if headers is None:
+            return pd.DataFrame()
 
-        # Add the token to the Authorization header
-        headers = {
-            "Authorization": f"Bearer {token}"
-        }
-
-        # Send request with JWT token in headers
         response = requests.get(f"{FASTAPI_URL}/db/questions", headers=headers)
+        json_data = handle_api_response(response)
 
-        if response.status_code == 200:
-            return pd.DataFrame(response.json())  # Convert JSON to DataFrame
-        elif response.status_code == 401:
-            st.error(response.json().get('detail', "Authentication error. Please log in again."))
-            st.button("Go to Login Page", on_click=go_to_login_page)
-            return pd.DataFrame()  # Return empty DataFrame on 401 error
+        if json_data:
+            return pd.DataFrame(json_data)
         else:
-            st.error(f"Failed to fetch questions: {response.status_code}")
-            return pd.DataFrame()  # Return empty DataFrame on other failures
+            return pd.DataFrame()
 
     except Exception as e:
         st.error(f"Error fetching questions: {e}")
-        return pd.DataFrame()  # Return empty DataFrame on exception
+        return pd.DataFrame()
 
 # Fetch user results from FastAPI
 def fetch_user_results_from_fastapi(user_id):
     try:
-        # Retrieve the token from session state
-        token = st.session_state.get('jwt_token')
+        headers = get_jwt_headers()
+        if headers is None:
+            return pd.DataFrame()
 
-        # Add the token to the Authorization header
-        headers = {
-            "Authorization": f"Bearer {token}"
-        }
-
-        # Send request with JWT token in headers
         response = requests.get(f"{FASTAPI_URL}/db/user_results/{user_id}", headers=headers)
+        json_data = handle_api_response(response)
 
-        if response.status_code == 200:
-            json_data = response.json()
-            if json_data:  # Check if the response JSON is not empty
-                return pd.DataFrame(json_data)  # Convert JSON to DataFrame
-            else:
-                return pd.DataFrame()  # Return empty DataFrame if no data
-        elif response.status_code == 401:
-            st.error(response.json().get('detail', "Authentication error. Please log in again."))
-            st.button("Go to Login Page", on_click=go_to_login_page)
-            return pd.DataFrame()  # Return empty DataFrame on 401 error
+        if json_data:
+            return pd.DataFrame(json_data)
         else:
-            st.error(f"Failed to fetch user results: {response.status_code}")
-            return pd.DataFrame()  # Return empty DataFrame on other failures
+            return pd.DataFrame()
 
     except Exception as e:
         st.error(f"Error fetching user results: {e}")
-        return pd.DataFrame()  # Return empty DataFrame on exception
+        return pd.DataFrame()
 
 # Update user result using FastAPI
 def update_user_result_in_fastapi(user_id, task_id, status, chatgpt_response):
     try:
-        # Retrieve the token from session state
-        token = st.session_state.get('jwt_token')
+        headers = get_jwt_headers()
+        if headers is None:
+            return
 
-        # Add the token to the Authorization header
-        headers = {
-            "Authorization": f"Bearer {token}"
-        }
-
-        # Data to be sent to FastAPI
         data = {
             "user_id": user_id,
             "task_id": task_id,
@@ -147,16 +144,8 @@ def update_user_result_in_fastapi(user_id, task_id, status, chatgpt_response):
             "chatgpt_response": chatgpt_response
         }
 
-        # Send PUT request with JWT token in headers
         response = requests.put(f"{FASTAPI_URL}/db/update_result", json=data, headers=headers)
-
-        if response.status_code == 200:
-            st.success("Result updated successfully!")
-        elif response.status_code == 401:
-            st.error(response.json().get('detail', "Authentication error. Please log in again."))
-            st.button("Go to Login Page", on_click=go_to_login_page)
-        else:
-            st.error(f"Failed to update result: {response.status_code}")
+        handle_api_response(response, success_message="Result updated successfully!")
 
     except Exception as e:
         st.error(f"Error updating result: {e}")
@@ -165,31 +154,23 @@ def update_user_result_in_fastapi(user_id, task_id, status, chatgpt_response):
 # Fetch PDF summary from FastAPI
 def fetch_pdf_summary_from_fastapi(file_name, extraction_method):
     try:
-        # Retrieve the token from session state
-        token = st.session_state.get('jwt_token')
-        
+        headers = get_jwt_headers()
+        if headers is None:
+            return None
+
         data = {
             "file_name": file_name,
             "extraction_method": extraction_method
         }
-        
-        # Add the token to the Authorization header
-        headers = {
-            "Authorization": f"Bearer {token}"
-        }
-        
+
         response = requests.post(f"{FASTAPI_URL}/s3/fetch_pdf_summary/", json=data, headers=headers)
-        
-        if response.status_code == 401:
-            st.error(response.json().get('detail', "Authentication error. Please log in again."))
-            st.button("Go to Login Page", on_click=go_to_login_page)
-            return None
-        
-        elif response.status_code == 200:
-            return response.json().get('summary', None)
+        json_data = handle_api_response(response)
+
+        if json_data:
+            return json_data.get('summary', None)
         else:
-            st.error(f"Failed to fetch PDF summary: {response.status_code}")
             return None
+
     except Exception as e:
         st.error(f"Error fetching PDF summary: {e}")
         return None
@@ -198,10 +179,8 @@ def fetch_pdf_summary_from_fastapi(file_name, extraction_method):
 # Function to get chatgpt response using FastAPI
 def get_chatgpt_response_via_fastapi(question, instructions=None, preprocessed_data=None):
     try:
-        # Retrieve the token from session state
-        token = st.session_state.get('jwt_token')
-        if not token:
-            st.error("No JWT token found. Please log in.")
+        headers = get_jwt_headers()
+        if headers is None:
             return None
 
         data = {
@@ -209,38 +188,24 @@ def get_chatgpt_response_via_fastapi(question, instructions=None, preprocessed_d
             "instructions": instructions,
             "preprocessed_data": preprocessed_data
         }
-        
-        # Add the token to the Authorization header
-        headers = {
-            "Authorization": f"Bearer {token}"
-        }
 
         response = requests.post(f"{FASTAPI_URL}/gpt/ask", json=data, headers=headers)
-        
-        if response.status_code == 401:
-            st.error(response.json().get('detail', "Authentication error. Please log in again."))
-            st.button("Go to Login Page", on_click=go_to_login_page)
-            return None
-        
-        elif response.status_code == 200:
-            return response.json().get("response", "No response from ChatGPT")
+        json_data = handle_api_response(response)
+
+        if json_data:
+            return json_data.get("response", "No response from ChatGPT")
         else:
-            st.error(f"Failed to get ChatGPT response: {response.status_code}")
             return None
-    
+
     except Exception as e:
         st.error(f"Error communicating with FastAPI: {e}")
         return None
 
-    
-
 # Function to compare response using FastAPI
 def compare_and_update_status_via_fastapi(selected_row, chatgpt_response, instructions):
     try:
-        # Retrieve the token from session state
-        token = st.session_state.get('jwt_token')
-        if not token:
-            st.error("No JWT token found. Please log in.")
+        headers = get_jwt_headers()
+        if headers is None:
             return None
 
         data = {
@@ -249,24 +214,14 @@ def compare_and_update_status_via_fastapi(selected_row, chatgpt_response, instru
             "instructions": instructions
         }
 
-        # Add the token to the Authorization header
-        headers = {
-            "Authorization": f"Bearer {token}"
-        }
-
         response = requests.post(f"{FASTAPI_URL}/gpt/compare", json=data, headers=headers)
-        
-        if response.status_code == 401:
-            st.error(response.json().get('detail', "Authentication error. Please log in again."))
-            st.button("Go to Login Page", on_click=go_to_login_page)
-            return None
-        
-        elif response.status_code == 200:
-            return response.json().get("comparison_result", "Error")
+        json_data = handle_api_response(response)
+
+        if json_data:
+            return json_data.get("comparison_result", "Error")
         else:
-            st.error(f"Failed to compare response: {response.status_code}")
             return None
-    
+
     except Exception as e:
         st.error(f"Error comparing response: {e}")
         return None

@@ -4,7 +4,7 @@ from openai.error import OpenAIError, AuthenticationError, RateLimitError, APICo
 
 # Initialize logging
 logger = logging.getLogger("uvicorn")
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 
 # Configuration for response limits
 MAX_SENTENCES = 10
