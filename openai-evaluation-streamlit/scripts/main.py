@@ -1,21 +1,17 @@
 import os
 import sys
 from dotenv import load_dotenv
-
-# Add the 'scripts' folder to the Python path if it's not already there
-sys.path.append(os.path.dirname(__file__))
-
-from data_handling.clone_repo import clone_repository
-from data_handling.load_dataset import load_gaia_dataset
-from api_utils.amazon_s3_utils import init_s3_client, upload_files_to_s3_and_update_paths
+from scripts.data_handling.clone_repo import clone_repository
+from scripts.data_handling.load_dataset import load_gaia_dataset
+from scripts.api_utils.amazon_s3_utils import init_s3_client, upload_files_to_s3_and_update_paths
 from huggingface_hub import login
-from api_utils.azure_sql_utils import insert_dataframe_to_sql
+from scripts.api_utils.azure_sql_utils import insert_dataframe_to_sql, set_sqlalchemy_connection_params  # Import the setter function
 from datetime import datetime
-from data_handling.delete_cache import delete_cache_folder
+from scripts.data_handling.delete_cache import delete_cache_folder
 
 # Load environment variables from .env file
 load_dotenv()
-
+#TO RUN IN COMMAND LINE USE python -m scripts.main inside poetry shell
 def process_dataset():
     try:
         # Set the environment variable for Hugging Face cache directory
@@ -33,6 +29,17 @@ def process_dataset():
         aws_secret_key = os.getenv('AWS_SECRET_KEY')
         bucket_name = os.getenv('S3_BUCKET_NAME')
         repo_url = os.getenv('GAIA_REPO_URL')
+
+        # Get Azure SQL connection environment variables
+        azure_sql_params = {
+            "server": os.getenv('AZURE_SQL_SERVER'),
+            "user": os.getenv('AZURE_SQL_USER'),
+            "password": os.getenv('AZURE_SQL_PASSWORD'),
+            "database": os.getenv('AZURE_SQL_DATABASE')
+        }
+
+        # Set the connection parameters for Azure SQL
+        set_sqlalchemy_connection_params(azure_sql_params)  # Ensure the connection parameters are set
 
         # Ensure tokens are available
         if not hf_token:
@@ -61,7 +68,7 @@ def process_dataset():
             table_name = "GaiaDataset"
             insert_dataframe_to_sql(df, table_name)
 
-            # Step 6: Save the updated DataFrame to a new CSV file
+            # Step 6: Save the updated DataFrame to a new CSV file (optional)
             #output_dir = os.path.join(cache_dir, 'data_to_azuresql')
             #os.makedirs(output_dir, exist_ok=True)
             #output_csv_file = os.path.join(output_dir, 'gaia_data_view.csv')

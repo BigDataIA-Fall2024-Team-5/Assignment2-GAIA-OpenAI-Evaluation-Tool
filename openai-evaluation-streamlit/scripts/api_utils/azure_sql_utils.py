@@ -1,4 +1,3 @@
-import os
 import pandas as pd
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
@@ -7,25 +6,32 @@ from sqlalchemy.exc import SQLAlchemyError, OperationalError
 import logging
 import numpy as np
 
-# Load environment variables
-load_dotenv()
-
 # Initialize logging
 logger = logging.getLogger("uvicorn")
 logger.setLevel(logging.INFO)
 
-# Centralized utility to get SQLAlchemy connection string
+# Global variable to store SQLAlchemy connection params
+_sqlalchemy_params = None
+
+def set_sqlalchemy_connection_params(params: dict):
+    """
+    Set the SQLAlchemy connection parameters (server, user, password, database).
+    This will be called from fast_main.py.
+    """
+    global _sqlalchemy_params
+    _sqlalchemy_params = params
+
 def get_sqlalchemy_connection_string():
     """
-    Constructs an SQLAlchemy connection string for Azure SQL Database.
+    Constructs an SQLAlchemy connection string for Azure SQL Database using the set parameters.
     """
-    server = os.getenv('AZURE_SQL_SERVER')
-    user = os.getenv('AZURE_SQL_USER')
-    password = os.getenv('AZURE_SQL_PASSWORD')
-    database = os.getenv('AZURE_SQL_DATABASE')
-
-    if not all([server, user, password, database]):
-        raise ValueError("Missing Azure SQL environment variables.")
+    if not _sqlalchemy_params:
+        raise ValueError("Azure SQL connection parameters not set. Call set_sqlalchemy_connection_params first.")
+    
+    server = _sqlalchemy_params['server']
+    user = _sqlalchemy_params['user']
+    password = _sqlalchemy_params['password']
+    database = _sqlalchemy_params['database']
 
     return f"mssql+pymssql://{user}:{password}@{server}/{database}"
 

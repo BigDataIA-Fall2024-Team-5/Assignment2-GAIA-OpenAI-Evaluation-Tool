@@ -9,25 +9,79 @@ FASTAPI_BASE_URL = "http://localhost:8000"  # Update with your actual FastAPI UR
 def go_back_to_main():
     st.session_state.page = 'user_page'
 
+
+def go_to_login_page():
+    for key in list(st.session_state.keys()):
+        if key != 'page': 
+            del st.session_state[key]
+    
+    # Set the page to login page
+    st.session_state.page = 'login'
+
 # Fetch questions (GAIA dataset) from FastAPI
-def fetch_questions_from_api():
+def fetch_questions_from_fastapi():
     try:
-        response = requests.get(f"{FASTAPI_BASE_URL}/db/questions")
+        # Retrieve the token from session state
+        token = st.session_state.get('jwt_token')
+
+        # Add the token to the Authorization header
+        headers = {
+            "Authorization": f"Bearer {token}"
+        }
+
+        # Send request with JWT token in headers
+        response = requests.get(f"{FASTAPI_BASE_URL}/db/questions", headers=headers)
         response.raise_for_status()  # Raise an error for bad responses
-        return pd.DataFrame(response.json())  # Convert the response to a DataFrame
+
+        # Convert the response to a DataFrame
+        return pd.DataFrame(response.json())
+
+    except requests.exceptions.HTTPError as http_err:
+        # Handle authentication errors
+        if response.status_code == 401:
+            st.error(response.json().get('detail', "Authentication error. Please log in again."))
+            st.button("Go to Login Page", on_click=go_to_login_page)
+        else:
+            st.error(f"HTTP error occurred: {http_err}")
+        return None
+
     except requests.exceptions.RequestException as e:
+        # Handle other request errors
         st.error(f"Error fetching questions: {e}")
         return None
 
 # Fetch user-specific results from FastAPI
-def fetch_user_results_from_api(user_id):
+def fetch_user_results_from_fastapi(user_id):
     try:
-        response = requests.get(f"{FASTAPI_BASE_URL}/db/user_results/{user_id}")
+        # Retrieve the token from session state
+        token = st.session_state.get('jwt_token')
+
+        # Add the token to the Authorization header
+        headers = {
+            "Authorization": f"Bearer {token}"
+        }
+
+        # Send request with JWT token in headers
+        response = requests.get(f"{FASTAPI_BASE_URL}/db/user_results/{user_id}", headers=headers)
         response.raise_for_status()  # Raise an error for bad responses
-        return pd.DataFrame(response.json())  # Convert the response to a DataFrame
+
+        # Convert the response to a DataFrame
+        return pd.DataFrame(response.json())
+
+    except requests.exceptions.HTTPError as http_err:
+        # Handle authentication errors
+        if response.status_code == 401:
+            st.error(response.json().get('detail', "Authentication error. Please log in again."))
+            st.button("Go to Login Page", on_click=go_to_login_page)
+        else:
+            st.error(f"HTTP error occurred: {http_err}")
+        return None
+
     except requests.exceptions.RequestException as e:
+        # Handle other request errors
         st.error(f"Error fetching user results: {e}")
         return None
+
 
 # Main summary page logic
 def run_summary_page(df, user_results_df):
@@ -106,10 +160,10 @@ def run_view_summary():
         return
 
     # Fetch the main dataset (GAIA dataset) from FastAPI
-    df = fetch_questions_from_api()
+    df = fetch_questions_from_fastapi()
     
     # Fetch user-specific results (returns None if no results are found)
-    user_results_df = fetch_user_results_from_api(st.session_state['user_id'])
+    user_results_df = fetch_user_results_from_fastapi(st.session_state['user_id'])
 
     # Ensure the main dataset was fetched successfully
     if df is None:

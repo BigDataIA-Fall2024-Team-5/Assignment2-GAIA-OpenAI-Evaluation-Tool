@@ -2,14 +2,9 @@ import logging
 import openai
 from openai.error import OpenAIError, AuthenticationError, RateLimitError, APIConnectionError
 
-# Set up the logger for FastAPI
-logging.basicConfig(
-    level=logging.DEBUG,  # Change level to INFO, ERROR as needed
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler()]  # This logs to the console. You can add FileHandler if needed
-)
-
-logger = logging.getLogger("uvicorn")  # Using the uvicorn logger as base, or use __name__
+# Initialize logging
+logger = logging.getLogger("uvicorn")
+logger.setLevel(logging.INFO)
 
 # Configuration for response limits
 MAX_SENTENCES = 10

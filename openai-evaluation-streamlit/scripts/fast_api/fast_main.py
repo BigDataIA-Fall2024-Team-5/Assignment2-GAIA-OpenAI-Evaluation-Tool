@@ -8,7 +8,7 @@ from scripts.fast_api.db_endpoints import db_router
 from scripts.fast_api.pipeline_endpoints import pipeline_router
 from scripts.api_utils.amazon_s3_utils import initialize_s3_client_and_bucket, get_s3_client
 from scripts.api_utils.chatgpt_utils import init_openai
-
+from scripts.api_utils.azure_sql_utils import set_sqlalchemy_connection_params  # new function to set parameters
 
 logger = logging.getLogger("uvicorn")
 logger.setLevel(logging.INFO)
@@ -48,6 +48,24 @@ async def startup_event():
     
     except Exception as e:
         logger.error(f"Failed to initialize OpenAI API: {str(e)}")
+    
+    # Set SQLAlchemy connection params (for Azure SQL)
+    try:
+        azure_sql_params = {
+            "server": os.getenv('AZURE_SQL_SERVER'),
+            "user": os.getenv('AZURE_SQL_USER'),
+            "password": os.getenv('AZURE_SQL_PASSWORD'),
+            "database": os.getenv('AZURE_SQL_DATABASE')
+        }
+        if not all(azure_sql_params.values()):
+            logger.error("Azure SQL credentials missing in environment variables.")
+        else:
+            set_sqlalchemy_connection_params(azure_sql_params)
+            logger.info("Azure SQL connection params set successfully at startup.")
+    
+    except Exception as e:
+        logger.error(f"Failed to set Azure SQL connection params: {str(e)}")
+
 
 # Include the routers
 app.include_router(auth_router, prefix="/auth", tags=["Authentication"])

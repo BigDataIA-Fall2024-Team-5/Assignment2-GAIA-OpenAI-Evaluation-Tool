@@ -68,53 +68,99 @@ def display_question_table(df):
 
     return current_df
 
-# Fetch questions from FastAPI
-def fetch_dataframe_from_fastapi():
+# Fetch questions from FastAPI 
+def fetch_questions_from_fastapi():
     try:
-        response = requests.get(f"{FASTAPI_URL}/db/questions")
+        # Retrieve the token from session state
+        token = st.session_state.get('jwt_token')
+
+        # Add the token to the Authorization header
+        headers = {
+            "Authorization": f"Bearer {token}"
+        }
+
+        # Send request with JWT token in headers
+        response = requests.get(f"{FASTAPI_URL}/db/questions", headers=headers)
+
         if response.status_code == 200:
             return pd.DataFrame(response.json())  # Convert JSON to DataFrame
+        elif response.status_code == 401:
+            st.error(response.json().get('detail', "Authentication error. Please log in again."))
+            st.button("Go to Login Page", on_click=go_to_login_page)
+            return pd.DataFrame()  # Return empty DataFrame on 401 error
         else:
             st.error(f"Failed to fetch questions: {response.status_code}")
-            return pd.DataFrame()  # Return empty DataFrame on failure
+            return pd.DataFrame()  # Return empty DataFrame on other failures
+
     except Exception as e:
         st.error(f"Error fetching questions: {e}")
-        return pd.DataFrame()
+        return pd.DataFrame()  # Return empty DataFrame on exception
 
 # Fetch user results from FastAPI
 def fetch_user_results_from_fastapi(user_id):
     try:
-        response = requests.get(f"{FASTAPI_URL}/db/user_results/{user_id}")
+        # Retrieve the token from session state
+        token = st.session_state.get('jwt_token')
+
+        # Add the token to the Authorization header
+        headers = {
+            "Authorization": f"Bearer {token}"
+        }
+
+        # Send request with JWT token in headers
+        response = requests.get(f"{FASTAPI_URL}/db/user_results/{user_id}", headers=headers)
+
         if response.status_code == 200:
             json_data = response.json()
             if json_data:  # Check if the response JSON is not empty
                 return pd.DataFrame(json_data)  # Convert JSON to DataFrame
             else:
                 return pd.DataFrame()  # Return empty DataFrame if no data
+        elif response.status_code == 401:
+            st.error(response.json().get('detail', "Authentication error. Please log in again."))
+            st.button("Go to Login Page", on_click=go_to_login_page)
+            return pd.DataFrame()  # Return empty DataFrame on 401 error
         else:
             st.error(f"Failed to fetch user results: {response.status_code}")
-            return pd.DataFrame()  # Return empty DataFrame on failure
+            return pd.DataFrame()  # Return empty DataFrame on other failures
+
     except Exception as e:
         st.error(f"Error fetching user results: {e}")
         return pd.DataFrame()  # Return empty DataFrame on exception
 
-
 # Update user result using FastAPI
 def update_user_result_in_fastapi(user_id, task_id, status, chatgpt_response):
     try:
+        # Retrieve the token from session state
+        token = st.session_state.get('jwt_token')
+
+        # Add the token to the Authorization header
+        headers = {
+            "Authorization": f"Bearer {token}"
+        }
+
+        # Data to be sent to FastAPI
         data = {
             "user_id": user_id,
             "task_id": task_id,
             "status": status,
             "chatgpt_response": chatgpt_response
         }
-        response = requests.put(f"{FASTAPI_URL}/db/update_result", json=data)
+
+        # Send PUT request with JWT token in headers
+        response = requests.put(f"{FASTAPI_URL}/db/update_result", json=data, headers=headers)
+
         if response.status_code == 200:
             st.success("Result updated successfully!")
+        elif response.status_code == 401:
+            st.error(response.json().get('detail', "Authentication error. Please log in again."))
+            st.button("Go to Login Page", on_click=go_to_login_page)
         else:
             st.error(f"Failed to update result: {response.status_code}")
+
     except Exception as e:
         st.error(f"Error updating result: {e}")
+
 
 # Fetch PDF summary from FastAPI
 def fetch_pdf_summary_from_fastapi(file_name, extraction_method):
@@ -339,7 +385,7 @@ def apply_filters(df, selected_levels, selected_file_types, selected_statuses):
 def run_explore_questions():
 
     # Fetch the questions from FastAPI
-    df = fetch_dataframe_from_fastapi()
+    df = fetch_questions_from_fastapi()
 
     # Initialize session state for pagination and instructions
     initialize_session_state(df)
