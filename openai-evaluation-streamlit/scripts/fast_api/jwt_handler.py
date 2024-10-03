@@ -1,6 +1,6 @@
 import os
 import logging
-from jose import JWTError, jwt
+from jose import JWTError, jwt, ExpiredSignatureError
 from datetime import datetime, timedelta
 from passlib.context import CryptContext
 from fastapi import HTTPException, status
@@ -15,7 +15,7 @@ load_dotenv()
 # JWT secret and algorithm (store in .env for security)
 SECRET_KEY = os.getenv("SECRET_KEY", "your_default_secret_key")  # Default for development, always set in production
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30  # Token expiry time
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 # Password hashing context
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -44,18 +44,16 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
-# Decode a JWT token with logging for errors
-def decode_token(token: str) -> dict:
+# Decode Token
+def decode_token(token: str):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         return payload
-    except JWTError as e:
-        logging.error(f"JWT decode error: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    except ExpiredSignatureError:
+        raise ExpiredSignatureError("Token has expired. Please log in again.")
+    except JWTError:
+        raise JWTError("Invalid token")
+
 
 # Validate password strength
 def validate_password_strength(password: str):

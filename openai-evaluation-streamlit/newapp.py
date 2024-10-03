@@ -1,4 +1,3 @@
-import os
 import streamlit as st
 from dotenv import load_dotenv
 from streamlit_pages.login_page import login_page
@@ -24,17 +23,6 @@ def main():
     st.session_state.setdefault('user_id', None)
     st.session_state.setdefault('user', '')
     st.session_state.setdefault('role', '')
-    
-
-    # Debug: Print the current session state values for tracking
-    st.write("### Debug Info")
-    st.write(f"Current Page: {st.session_state.get('page')}")
-    st.write(f"Login Success: {st.session_state.get('login_success')}")
-    st.write(f"username: {st.session_state.get('username')}")
-    st.write(f"User ID: {st.session_state.get('user_id')}")
-    st.write(f"user: {st.session_state.get('user')}")
-    st.write(f"Role: {st.session_state.get('role')}")
-    st.write(f"jwt_token: {st.session_state.get('jwt_token')}")
 
     # Ensure user is logged in before accessing certain pages
     if st.session_state.page in ['user_page', 'explore_questions', 'admin', 'view_summary'] and not st.session_state['login_success']:

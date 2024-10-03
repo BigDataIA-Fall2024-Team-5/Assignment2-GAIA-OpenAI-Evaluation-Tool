@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from scripts.api_utils.amazon_s3_utils import read_pdf_summary_from_s3, get_s3_client
 import logging
 from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError, jwt
+from jose import JWTError, ExpiredSignatureError
 from scripts.fast_api.jwt_handler import decode_token
 
 s3_router = APIRouter()
@@ -21,10 +21,13 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 # Fetch PDF summary from S3 endpoint with JWT token authentication
 @s3_router.post("/fetch_pdf_summary/")
-def fetch_pdf_summary(request: FetchPDFSummaryRequest, token: str = Depends(oauth2_scheme)):
+async def fetch_pdf_summary(request: FetchPDFSummaryRequest, token: str = Depends(oauth2_scheme)):
     try:
+        logger.info(f"Starting PDF fetch for file: {request.file_name}, method: {request.extraction_method}")
+        
         # Decode and verify the JWT token
         payload = decode_token(token)
+        logger.info(f"Token decoded successfully: {payload}")
         
         # Use the S3 client from amazon_s3_utils
         s3_client_instance = get_s3_client()
@@ -38,14 +41,18 @@ def fetch_pdf_summary(request: FetchPDFSummaryRequest, token: str = Depends(oaut
         )
         
         if summary:
+            logger.info(f"PDF summary fetched successfully for file: {request.file_name}")
             return {"summary": summary}
         else:
+            logger.warning(f"PDF summary not found for file: {request.file_name}")
             raise HTTPException(status_code=404, detail="PDF summary not available.")
     
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Invalid or expired token.")
-    
+    except (ExpiredSignatureError, JWTError) as token_error:
+        # Handle expired or invalid token
+        logger.error(f"Token error: {token_error}")
+        raise HTTPException(status_code=401, detail=str(token_error))
+
     except Exception as e:
-        # Log the actual error message
-        logger.error(f"Error fetching PDF summary: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        # Log any other unexpected errors and return 500
+        logger.error(f"Unexpected error while fetching PDF summary: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
