@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 import streamlit as st
 import pandas as pd
 
-
 load_dotenv()
 
 fastapi_url = os.getenv("FASTAPI_URL")
@@ -22,8 +21,8 @@ def go_to_login_page():
     # Set the page to login page
     st.session_state.page = 'login'
 
-# Fetch questions (GAIA dataset) from FastAPI
-def fetch_questions_from_fastapi():
+# Fetch questions (GAIA dataset) from FastAPI with dataset_split
+def fetch_questions_from_fastapi(dataset_split="validation"):
     try:
         # Retrieve the token from session state
         token = st.session_state.get('jwt_token')
@@ -33,8 +32,8 @@ def fetch_questions_from_fastapi():
             "Authorization": f"Bearer {token}"
         }
 
-        # Send request with JWT token in headers
-        response = requests.get(f"{fastapi_url}/db/questions", headers=headers)
+        # Send request with JWT token in headers, and include dataset_split query parameter
+        response = requests.get(f"{fastapi_url}/db/questions?dataset_split={dataset_split}", headers=headers)
         response.raise_for_status()  # Raise an error for bad responses
 
         # Convert the response to a DataFrame
@@ -54,8 +53,8 @@ def fetch_questions_from_fastapi():
         st.error(f"Error fetching questions: {e}")
         return None
 
-# Fetch user-specific results from FastAPI
-def fetch_user_results_from_fastapi(user_id):
+# Fetch user-specific results from FastAPI with dataset_split
+def fetch_user_results_from_fastapi(user_id, dataset_split="validation"):
     try:
         # Retrieve the token from session state
         token = st.session_state.get('jwt_token')
@@ -65,8 +64,8 @@ def fetch_user_results_from_fastapi(user_id):
             "Authorization": f"Bearer {token}"
         }
 
-        # Send request with JWT token in headers
-        response = requests.get(f"{fastapi_url}/db/user_results/{user_id}", headers=headers)
+        # Send request with JWT token in headers, and include dataset_split query parameter
+        response = requests.get(f"{fastapi_url}/db/user_results/{user_id}?dataset_split={dataset_split}", headers=headers)
         response.raise_for_status()  # Raise an error for bad responses
 
         # Convert the response to a DataFrame
@@ -89,10 +88,6 @@ def fetch_user_results_from_fastapi(user_id):
 
 # Main summary page logic
 def run_summary_page(df, user_results_df):
-    st.title("Summary of Results")
-
-    # Add a "Back" button to return to the main page
-    st.button("Back to Main", on_click=go_back_to_main)
 
     # Ensure 'task_id' is of string type in both DataFrames
     df['task_id'] = df['task_id'].astype(str)
@@ -157,17 +152,24 @@ def run_summary_page(df, user_results_df):
 
 # Call the view summary function
 def run_view_summary():
-    # Ensure 'user_id' is available in session state
-    if not st.session_state.get('user_id'):
-        st.error("User ID not found. Please log in again.")
-        st.session_state.page = 'login'  # Redirect to login page
-        return
-
-    # Fetch the main dataset (GAIA dataset) from FastAPI
-    df = fetch_questions_from_fastapi()
     
-    # Fetch user-specific results (returns None if no results are found)
-    user_results_df = fetch_user_results_from_fastapi(st.session_state['user_id'])
+    st.title("Summary of Results")
+
+    # Add a "Back" button to return to the main page
+    st.button("Back to Main", on_click=go_back_to_main)
+
+    # Allow the user to select dataset split
+    dataset_split = st.radio(
+        "Select Dataset Split:",
+        options=["test", "validation"],
+        index=1  # Default to validation
+    )
+
+    # Fetch the main dataset (GAIA dataset) from FastAPI with the selected dataset split
+    df = fetch_questions_from_fastapi(dataset_split=dataset_split)
+    
+    # Fetch user-specific results with the selected dataset split
+    user_results_df = fetch_user_results_from_fastapi(st.session_state['user_id'], dataset_split=dataset_split)
 
     # Ensure the main dataset was fetched successfully
     if df is None:

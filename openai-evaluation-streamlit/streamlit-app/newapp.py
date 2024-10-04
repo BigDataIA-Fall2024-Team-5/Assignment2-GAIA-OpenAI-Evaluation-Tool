@@ -6,7 +6,10 @@ from streamlit_pages.admin_dataset_management import admin_dataset_management_pa
 from streamlit_pages.admin_user_management import admin_user_management_page
 from streamlit_pages.user_page import user_page
 from streamlit_pages.explore_questions import run_explore_questions
+from streamlit_pages.validation_questions import run_validation_questions
+from streamlit_pages.test_questions import run_test_questions
 from streamlit_pages.view_summary import run_view_summary
+
 
 def main():
     # Ensure critical session state values are set and persist throughout the app's navigation
@@ -43,6 +46,10 @@ def main():
         admin_user_management_page()
     elif st.session_state.page == 'explore_questions':
         run_explore_questions()
+    elif st.session_state.page == 'validation_questions':
+        run_validation_questions()
+    elif st.session_state.page == 'test_questions':
+        run_test_questions()
     elif st.session_state.page == 'view_summary':
         run_view_summary()
 

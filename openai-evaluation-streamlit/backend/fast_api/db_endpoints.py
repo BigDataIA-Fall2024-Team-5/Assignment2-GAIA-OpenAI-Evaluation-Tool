@@ -13,7 +13,7 @@ from api_utils.azure_sql_utils import (
 import logging
 from pydantic import BaseModel
 from datetime import datetime
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Literal
 
 # Initialize logging
 logger = logging.getLogger("uvicorn")
@@ -66,6 +66,8 @@ class UpdateResultModel(BaseModel):
     task_id: str
     status: str
     chatgpt_response: str
+    dataset_split: Literal['test', 'validation']
+
 
 # JWT token validation
 def get_current_user(token: str = Depends(oauth2_scheme)):
@@ -151,12 +153,21 @@ async def promote_user_to_admin(user_id: str, admin: str = Query(...), current_u
 
 # Fetch all questions endpoint with JWT validation
 @db_router.get("/questions", response_model=List[QuestionResponse], tags=["User call"])
-async def get_all_questions(current_user: dict = Depends(get_current_user)):
+async def get_all_questions(
+    dataset_split: Literal['test', 'validation'] = Query("validation", description="Specify 'test' or 'validation' dataset split."),
+    current_user: dict = Depends(get_current_user)
+):
     """
     Fetch all questions (GAIA dataset) from the database.
+    The dataset_split query parameter must be 'test' or 'validation'.
+    By default, it fetches from the 'validation' dataset.
     """
     try:
-        questions = fetch_all_questions()
+        # Map the dataset split to the appropriate table
+        table_name = "GaiaDataset_Validation" if dataset_split == "validation" else "GaiaDataset_Test"
+
+        # Fetch questions from the corresponding table
+        questions = fetch_all_questions(table_name=table_name)
         return questions
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -167,16 +178,21 @@ async def get_all_questions(current_user: dict = Depends(get_current_user)):
 
 # Fetch user-specific results endpoint with JWT validation
 @db_router.get("/user_results/{user_id}", response_model=List[UserResultResponse], tags=["User call"])
-async def get_user_results(user_id: str, current_user: dict = Depends(get_current_user)):
+async def get_user_results(
+    user_id: str, 
+    dataset_split: Literal['test', 'validation'] = Query("validation", description="Specify 'test' or 'validation' dataset split."),
+    current_user: dict = Depends(get_current_user)
+):
     """
-    Fetch user-specific results from the database by user_id.
+    Fetch user-specific results from the database by user_id and dataset_split.
     """
     try:
-        results = fetch_user_results(user_id)
+        # Fetch user results with the dataset_split filter
+        results = fetch_user_results(user_id=user_id, dataset_split=dataset_split)
         if not results:
-            logger.info(f"No results found for user '{user_id}', returning an empty list.")
+            logger.info(f"No results found for user '{user_id}' in dataset '{dataset_split}', returning an empty list.")
             return []
-        logger.info(f"Fetched results for user '{user_id}'.")
+        logger.info(f"Fetched results for user '{user_id}' in dataset '{dataset_split}'.")
         return results
     except ValueError as e:
         logger.error(f"Error fetching results for user '{user_id}': {e}")
@@ -188,6 +204,7 @@ async def get_user_results(user_id: str, current_user: dict = Depends(get_curren
         logger.error(f"Unexpected error while fetching results for user '{user_id}': {e}")
         raise HTTPException(status_code=500, detail="An unexpected error occurred while fetching results.")
 
+
 # Update user result endpoint with JWT validation
 @db_router.put("/update_result", tags=["User call"])
 async def update_user_result(result_data: UpdateResultModel, current_user: dict = Depends(get_current_user)):
@@ -195,15 +212,17 @@ async def update_user_result(result_data: UpdateResultModel, current_user: dict 
     Update user result in the database.
     """
     try:
+        # Now include dataset_split in the update logic
         update_success = update_user_result_in_db(
             result_data.user_id,
             result_data.task_id,
             result_data.status,
-            result_data.chatgpt_response
+            result_data.chatgpt_response,
+            result_data.dataset_split 
         )
         
         if update_success:
-            logger.info(f"Updated result for user '{result_data.user_id}', task '{result_data.task_id}'.")
+            logger.info(f"Updated result for user '{result_data.user_id}', task '{result_data.task_id}', dataset '{result_data.dataset_split}'.")
             return {"message": "Result updated successfully"}
         else: 
             raise HTTPException(status_code=400, detail="Failed to update the result.")
@@ -216,3 +235,4 @@ async def update_user_result(result_data: UpdateResultModel, current_user: dict 
     except Exception as e:
         logger.error(f"Unexpected error while updating user result: {e}")
         raise HTTPException(status_code=500, detail="An unexpected error occurred while updating the result.")
+
