@@ -1,4 +1,4 @@
-# explore_questions.py
+# validations_questions.py
 import os
 from dotenv import load_dotenv
 import streamlit as st
@@ -10,11 +10,12 @@ load_dotenv()
 fastapi_url = os.getenv("FASTAPI_URL")
 
 def go_back_to_user_page():
-    # Reset session state but keep user info
-    st.session_state.show_instructions = False
-    st.session_state.current_page = 0
-    st.session_state.last_selected_row_index = None
-    st.session_state.chatgpt_response = None 
+    keys_to_remove = ['df', 'user_results', 'show_instructions', 'current_page', 'last_selected_row_index', 'chatgpt_response']
+    
+    for key in keys_to_remove:
+        if key in st.session_state:
+            del st.session_state[key]
+
     st.session_state.page = 'user_page'
 
 def go_to_login_page():
@@ -147,7 +148,7 @@ def update_user_result_in_fastapi(user_id, task_id, status, chatgpt_response, da
             "task_id": task_id,
             "status": status,
             "chatgpt_response": chatgpt_response,
-            "dataset_split": dataset_split  # Add dataset_split
+            "dataset_split": dataset_split 
         }
 
         # Send the updated result to the FastAPI endpoint
@@ -348,14 +349,14 @@ def apply_filters(df, selected_levels, selected_file_types, selected_statuses):
 def run_validation_questions():
 
     # Fetch the questions from FastAPI
-    df = fetch_questions_from_fastapi()
+    df = fetch_questions_from_fastapi(dataset_split="validation")
 
     # Initialize session state for pagination and instructions
     initialize_session_state(df)
 
     # Fetch user-specific results from FastAPI
     user_id = st.session_state.get('user_id')
-    user_results = fetch_user_results_from_fastapi(user_id)
+    user_results = fetch_user_results_from_fastapi(user_id, dataset_split="validation")
 
     # Check if user_results is empty
     if user_results is None or user_results.empty:
