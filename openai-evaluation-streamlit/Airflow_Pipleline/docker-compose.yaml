@@ -68,7 +68,9 @@ x-airflow-common:
     AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
     # WARNING: Use _PIP_ADDITIONAL_REQUIREMENTS option ONLY for a quick checks
     # for other purpose (development, test and especially production usage) build/extend Airflow image.
-    _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-pandas streamlit==1.38.0 openai==0.28 boto3==1.35.19 datasets==3.0.0 sqlalchemy==2.0.34 huggingface-hub==0.24.7 python-dotenv==1.0.1 pymssql==2.3.1 matplotlib==3.9.2 python-pptx==1.0.2 mutagen==1.47.0 python-docx==1.1.2 openpyxl==3.1.5 pillow==10.4.0 pypdf2==3.0.1 bcrypt==3.2.2 diagrams==0.23.4 fastapi==0.115.0 uvicorn==0.31.0 python-jose==3.3.0 pydantic==2.9.2 passlib==1.7.4 pymupdf}
+    _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-apache-airflow==2.10.2 apache-airflow-providers-amazon==8.29.0 pandas PyMuPDF==1.24.11}
+
+
 
     # The following line can be used to set a custom config file, stored in the local config folder
     # If you want to use it, outcomment it and replace airflow.cfg with the name of your config file
