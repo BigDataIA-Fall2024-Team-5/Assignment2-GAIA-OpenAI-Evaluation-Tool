@@ -2,7 +2,7 @@ import os
 import bcrypt  # To hash the passwords
 from sqlalchemy import create_engine, text
 from dotenv import load_dotenv
-from backend.api_utils.azure_sql_utils import get_sqlalchemy_connection_string, set_sqlalchemy_connection_params
+from api_utils.azure_sql_utils import get_sqlalchemy_connection_string, set_sqlalchemy_connection_params
 
 # Load environment variables from .env file
 load_dotenv()
@@ -25,8 +25,9 @@ CREATE TABLE user_results (
     result_id INT IDENTITY(1,1) PRIMARY KEY,
     user_id NVARCHAR(50),
     task_id NVARCHAR(50),
+    dataset_split NVARCHAR(50),
     user_result_status NVARCHAR(50),
-    chatgpt_response NVARCHAR(MAX),  -- Column to store ChatGPT response
+    chatgpt_response NVARCHAR(MAX), 
     created_date DATETIME DEFAULT GETDATE(),
     FOREIGN KEY (user_id) REFERENCES users(user_id)
 );
@@ -34,8 +35,8 @@ CREATE TABLE user_results (
 
 # Default user and admin credentials
 default_users = [
-    {"username": "admin", "password": "admin", "role": "admin"},
-    {"username": "user", "password": "user", "role": "user"}
+    {"username": "admin", "password": "admin123", "role": "admin"},
+    {"username": "user", "password": "user123", "role": "user"}
 ]
 
 def setup_database():

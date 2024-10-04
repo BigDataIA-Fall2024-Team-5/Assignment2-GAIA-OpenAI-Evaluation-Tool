@@ -1,22 +1,22 @@
 import os
-import sys
 from dotenv import load_dotenv
+from huggingface_hub import login
 from data_handling.clone_repo import clone_repository
 from data_handling.load_dataset import load_gaia_dataset
-from api_utils.amazon_s3_utils import init_s3_client, upload_files_to_s3_and_update_paths
-from huggingface_hub import login
-from api_utils.azure_sql_utils import insert_dataframe_to_sql, set_sqlalchemy_connection_params  # Import the setter function
 from datetime import datetime
 from data_handling.delete_cache import delete_cache_folder
+from api_utils.amazon_s3_utils import init_s3_client, upload_files_to_s3_and_update_paths
+from api_utils.azure_sql_utils import insert_dataframe_to_sql, set_sqlalchemy_connection_params  # Import the setter function
+
 
 # Load environment variables from .env file
 load_dotenv()
-#TO RUN IN COMMAND LINE USE python -m backend.main inside poetry shell
+
+# TO RUN IN COMMAND LINE USE python -m backend.main inside poetry shell
 def process_dataset():
     try:
         # Set the environment variable for Hugging Face cache directory
         cache_dir = './.cache'
-
         os.environ["HF_HOME"] = cache_dir
         os.environ["HF_DATASETS_CACHE"] = cache_dir
 
@@ -39,7 +39,7 @@ def process_dataset():
         }
 
         # Set the connection parameters for Azure SQL
-        set_sqlalchemy_connection_params(azure_sql_params)  # Ensure the connection parameters are set
+        set_sqlalchemy_connection_params(azure_sql_params)
 
         # Ensure tokens are available
         if not hf_token:
@@ -52,44 +52,82 @@ def process_dataset():
         clone_dir = os.path.join(cache_dir, "gaia_repo")
         clone_repository(repo_url, clone_dir)
 
-        # Step 2: Load the dataset
-        df = load_gaia_dataset(cache_dir)
-        if df is not None:
-            # Add the 'created_date' column with the current timestamp
-            df['created_date'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        # Initialize a summary dictionary to track steps
+        summary = {
+            'repository_cloned': clone_dir,
+            'test_split': {
+                'status': 'Not Processed',
+                's3_uploaded': False,
+                'sql_inserted': False,
+                'records': 0
+            },
+            'validation_split': {
+                'status': 'Not Processed',
+                's3_uploaded': False,
+                'sql_inserted': False,
+                'records': 0
+            }
+        }
 
+        # Step 2: Load the dataset for both 'test' and 'validation' splits
+        df_split = load_gaia_dataset(cache_dir, split_name='test')
+        df_validation = load_gaia_dataset(cache_dir, split_name='validation')
+
+        # Process test split if loaded
+        if df_split is not None:
+            summary['test_split']['status'] = 'Loaded'
+            summary['test_split']['records'] = len(df_split)
+            
             # Step 3: Initialize S3 client
             s3_client = init_s3_client(aws_access_key, aws_secret_key)
 
-            # Step 4: Upload files to S3 and update paths
-            df = upload_files_to_s3_and_update_paths(df, s3_client, bucket_name, clone_dir)
+            # Step 4: Upload 'test' split files to S3 and update paths
+            df_split = upload_files_to_s3_and_update_paths(df_split, s3_client, bucket_name, clone_dir, split_name='test')
+            summary['test_split']['s3_uploaded'] = True
 
-            # Step 5: Insert the updated DataFrame into Azure SQL Database before saving to CSV
-            table_name = "GaiaDataset"
-            insert_dataframe_to_sql(df, table_name)
+            # Step 5: Insert the updated 'test' DataFrame into Azure SQL Database
+            insert_dataframe_to_sql(df_split, "GaiaDataset_Test")
+            summary['test_split']['sql_inserted'] = True
 
-            # Step 6: Save the updated DataFrame to a new CSV file (optional)
-            #output_dir = os.path.join(cache_dir, 'data_to_azuresql')
-            #os.makedirs(output_dir, exist_ok=True)
-            #output_csv_file = os.path.join(output_dir, 'gaia_data_view.csv')
-            #df.to_csv(output_csv_file, index=False)
+        # Process validation split if loaded
+        if df_validation is not None:
+            summary['validation_split']['status'] = 'Loaded'
+            summary['validation_split']['records'] = len(df_validation)
 
-            # Optional: Step 7: Delete the cache directory
-            # delete_cache_folder(cache_dir)
+            # Step 4: Upload 'validation' split files to S3 and update paths
+            df_validation = upload_files_to_s3_and_update_paths(df_validation, s3_client, bucket_name, clone_dir, split_name='validation')
+            summary['validation_split']['s3_uploaded'] = True
 
-            # Return a summary of the processing steps instead of the CSV file location
-            return f"""
-            Dataset processing complete:
-            - Repository cloned to: {clone_dir}
-            - Dataset successfully loaded
-            - Files uploaded to S3 bucket: {bucket_name}
-            - Data inserted into Azure SQL table: {table_name}
-            """
-        else:
-            return "Data loading failed."
-    
+            # Step 5: Insert the updated 'validation' DataFrame into Azure SQL Database
+            insert_dataframe_to_sql(df_validation, "GaiaDataset_Validation")
+            summary['validation_split']['sql_inserted'] = True
+
+        # Optional: Delete the cache directory
+        # delete_cache_folder(cache_dir)
+
+        # Construct a detailed summary message
+        summary_message = f"""
+        Dataset processing summary:
+        1. Repository cloned successfully to: {summary['repository_cloned']}
+        
+        2. Test Split:
+           - Status: {summary['test_split']['status']}
+           - Records Processed: {summary['test_split']['records']}
+           - S3 Upload: {'Success' if summary['test_split']['s3_uploaded'] else 'Failed'}
+           - Azure SQL Insertion: {'Success' if summary['test_split']['sql_inserted'] else 'Failed'}
+        
+        3. Validation Split:
+           - Status: {summary['validation_split']['status']}
+           - Records Processed: {summary['validation_split']['records']}
+           - S3 Upload: {'Success' if summary['validation_split']['s3_uploaded'] else 'Failed'}
+           - Azure SQL Insertion: {'Success' if summary['validation_split']['sql_inserted'] else 'Failed'}
+        """
+
+        return summary_message
+
     except Exception as e:
         return f"Error: {str(e)}"
+
 
 if __name__ == "__main__":
     print(process_dataset())

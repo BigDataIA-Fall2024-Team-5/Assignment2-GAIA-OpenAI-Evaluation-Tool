@@ -56,9 +56,17 @@ def get_s3_client():
         raise Exception("S3 client not initialized.")
     return s3_client_instance
 
-# Find a file by name in the repository
-def find_file_in_repo(file_name, repo_dir):
-    search_path = os.path.join(repo_dir, "2023", "validation", file_name)
+# Find a file by name in the repository based on the split (e.g., 'test' or 'validation')
+def find_file_in_repo(file_name, repo_dir, split_name):
+    """
+    Search for a file in the given repository directory for a specific split.
+    
+    :param file_name: Name of the file to find
+    :param repo_dir: The base repository directory
+    :param split_name: The dataset split (e.g., 'test', 'validation')
+    :return: Path to the file if found, else None
+    """
+    search_path = os.path.join(repo_dir, "2023", split_name, file_name)
     if os.path.exists(search_path):
         print(f"File {file_name} found at {search_path}")
         return search_path
@@ -67,20 +75,31 @@ def find_file_in_repo(file_name, repo_dir):
         return None
 
 # Upload files to S3 and update paths in the DataFrame
-def upload_files_to_s3_and_update_paths(dataset, s3_client, bucket_name, repo_dir):
+def upload_files_to_s3_and_update_paths(dataset, s3_client, bucket_name, repo_dir, split_name):
+    """
+    Upload files to S3 and update the file paths in the DataFrame.
+    
+    :param dataset: DataFrame containing the dataset with 'file_name' and 'file_path' columns
+    :param s3_client: Initialized S3 client for uploading files
+    :param bucket_name: Name of the S3 bucket
+    :param repo_dir: Base directory of the repository where files are stored
+    :param split_name: The split name of the dataset (e.g., 'test', 'validation')
+    :return: The updated DataFrame with S3 file paths
+    """
     total_files = 0
     files_uploaded = 0
     file_paths_updated = 0
     uploaded_file_types = set()  # Set to keep track of uploaded file types
 
-    s3_folder = "bronze/"
+    # Define the S3 folder as 'bronze/{split_name}/'
+    s3_folder = f"bronze/{split_name}/"
 
     for index, row in dataset.iterrows():
         if 'file_name' in row and row['file_name']:
             total_files += 1  # Increment total file name counter
 
-            # Find the file in the repository
-            local_file_path = find_file_in_repo(row['file_name'], repo_dir)
+            # Find the file in the repository based on the split
+            local_file_path = find_file_in_repo(row['file_name'], repo_dir, split_name)
             if local_file_path:
                 # Define the S3 key, which includes the folder and the file name
                 s3_key = f"{s3_folder}{row['file_name']}"
@@ -90,7 +109,7 @@ def upload_files_to_s3_and_update_paths(dataset, s3_client, bucket_name, repo_di
                     s3_client.upload_file(local_file_path, bucket_name, s3_key)
                     # Update file path to S3 URL
                     dataset.at[index, 'file_path'] = f"https://{bucket_name}.s3.amazonaws.com/{s3_key}"
-                    print(f"Uploaded {row['file_name']} to S3 (overwritten if already existed) under {s3_folder}.")
+                    print(f"Uploaded {row['file_name']} to S3 under {s3_folder}.")
                     files_uploaded += 1  # Increment files uploaded counter
                     file_paths_updated += 1  # Increment file paths updated counter
 
@@ -102,11 +121,11 @@ def upload_files_to_s3_and_update_paths(dataset, s3_client, bucket_name, repo_di
             else:
                 print(f"File {row['file_name']} not found in repository.")
     
-    print(f"\nSummary:")
+    print(f"\nSummary for {split_name} split:")
     print(f"Total rows with file names: {total_files}")
     print(f"Total files uploaded to S3: {files_uploaded}")
     print(f"Total file paths updated in DataFrame: {file_paths_updated}")
-    print(f"Uploaded file types: {', '.join(uploaded_file_types)}") 
+    print(f"Uploaded file types: {', '.join(uploaded_file_types)}")
 
     return dataset
 
