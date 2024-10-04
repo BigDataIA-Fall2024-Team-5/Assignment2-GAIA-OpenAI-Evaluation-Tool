@@ -75,8 +75,7 @@ x-airflow-common:
     # The following line can be used to set a custom config file, stored in the local config folder
     # If you want to use it, outcomment it and replace airflow.cfg with the name of your config file
     # AIRFLOW_CONFIG: '/opt/airflow/config/airflow.cfg'
-    AIRFLOW__CORE__XCOM_PICKLING: 'true'
-
+    AIRFLOW__CORE__XCOM_PICKLING: 'true'  
   volumes:
     - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags
     - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs
@@ -89,6 +88,8 @@ x-airflow-common:
       condition: service_healthy
     postgres:
       condition: service_healthy
+  env_file:
+    - .env
 
 services:
   postgres:
@@ -136,7 +137,8 @@ services:
       <<: *airflow-common-depends-on
       airflow-init:
         condition: service_completed_successfully
-
+    env_file:
+      - .env
   airflow-scheduler:
     <<: *airflow-common
     command: scheduler
@@ -151,7 +153,8 @@ services:
       <<: *airflow-common-depends-on
       airflow-init:
         condition: service_completed_successfully
-
+    env_file:
+      - .env
   airflow-worker:
     <<: *airflow-common
     command: celery worker
@@ -174,7 +177,8 @@ services:
       <<: *airflow-common-depends-on
       airflow-init:
         condition: service_completed_successfully
-
+    env_file:
+      - .env
   airflow-triggerer:
     <<: *airflow-common
     command: triggerer
@@ -189,7 +193,8 @@ services:
       <<: *airflow-common-depends-on
       airflow-init:
         condition: service_completed_successfully
-
+    env_file:
+      - .env
   airflow-init:
     <<: *airflow-common
     entrypoint: /bin/bash
@@ -253,7 +258,7 @@ services:
     user: "0:0"
     volumes:
       - ${AIRFLOW_PROJ_DIR:-.}:/sources
-
+  
   airflow-cli:
     <<: *airflow-common
     profiles:
@@ -266,7 +271,6 @@ services:
       - bash
       - -c
       - airflow
-
   # You can enable flower by adding "--profile flower" option e.g. docker-compose --profile flower up
   # or by explicitly targeted on the command line e.g. docker-compose up flower.
   # See: https://docs.docker.com/compose/profiles/
@@ -288,6 +292,8 @@ services:
       <<: *airflow-common-depends-on
       airflow-init:
         condition: service_completed_successfully
-
+    env_file:
+      - .env
 volumes:
   postgres-db-volume:
+
