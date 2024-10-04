@@ -3,8 +3,8 @@ from pydantic import BaseModel
 import logging
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, ExpiredSignatureError
-from backend.fast_api.jwt_handler import decode_token
-from backend.api_utils.amazon_s3_utils import read_pdf_summary_from_s3, get_s3_client
+from fast_api.jwt_handler import decode_token
+from api_utils.amazon_s3_utils import read_pdf_summary_from_s3, get_s3_client
 
 s3_router = APIRouter()
 

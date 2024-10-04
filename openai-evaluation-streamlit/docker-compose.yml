@@ -1,0 +1,30 @@
+version: "3.8"
+services:
+  fastapi:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - HF_TOKEN='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'
+      - OPENAI_API_KEY='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'
+      - AWS_ACCESS_KEY='AKIARSU7KMPCTAH75IZN'
+      - AWS_SECRET_KEY='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'
+      - S3_BUCKET_NAME='s3-openai-evaluation-app-storage'
+      - GAIA_REPO_URL='https://huggingface.co/datasets/gaia-benchmark/GAIA'
+      - AZURE_SQL_SERVER='dadabinikhil.database.windows.net'
+      - AZURE_SQL_DATABASE='Dadabi'
+      - AZURE_SQL_USER='nikhilgodalla'
+      - AZURE_SQL_PASSWORD='Password123'
+
+  streamlit:
+    build:
+      context: ./streamlit-app
+      dockerfile: Dockerfile
+    ports:
+      - "8501:8501"
+    environment:
+      - FASTAPI_URL=http://fastapi:8000 
+    depends_on:
+      - fastapi 

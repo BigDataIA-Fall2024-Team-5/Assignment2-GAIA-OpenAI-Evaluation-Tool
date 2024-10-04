@@ -1,8 +1,13 @@
+import os
+from dotenv import load_dotenv
 import streamlit as st
 import requests
 
-# Define your FastAPI endpoint for registration
-fastapi_url = "http://127.0.0.1:8000/auth/register"
+load_dotenv()
+
+fastapi_url = os.getenv("FASTAPI_URL")
+
+registration_url = f"{fastapi_url}/auth/register"
 
 # Callback function to go back to login page
 def go_to_login():
@@ -33,7 +38,7 @@ def handle_register():
         try:
             with st.spinner('Creating account...'):
                 # Make POST request to FastAPI
-                response = requests.post(fastapi_url, json=registration_data)
+                response = requests.post(registration_url, json=registration_data)
                 
                 if response.status_code == 200:
                     st.success("Account created successfully! Please log in with your new credentials.")

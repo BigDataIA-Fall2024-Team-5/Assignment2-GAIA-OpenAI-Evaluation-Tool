@@ -1,5 +1,4 @@
 import streamlit as st
-from dotenv import load_dotenv
 from streamlit_pages.login_page import login_page
 from streamlit_pages.register_page import register_page
 from streamlit_pages.admin_page import admin_page
@@ -8,9 +7,6 @@ from streamlit_pages.admin_user_management import admin_user_management_page
 from streamlit_pages.user_page import user_page
 from streamlit_pages.explore_questions import run_explore_questions
 from streamlit_pages.view_summary import run_view_summary
-
-# Load environment variables
-load_dotenv()
 
 def main():
     # Ensure critical session state values are set and persist throughout the app's navigation

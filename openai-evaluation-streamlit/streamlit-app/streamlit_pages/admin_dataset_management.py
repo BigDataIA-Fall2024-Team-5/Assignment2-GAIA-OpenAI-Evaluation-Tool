@@ -1,8 +1,12 @@
-import streamlit as st
+import os
 import requests
+import streamlit as st
+from dotenv import load_dotenv
 
-# FastAPI base URL
-fastapi_url = "http://127.0.0.1:8000/pipeline/process-dataset"
+load_dotenv()
+
+fastapi_url = os.getenv("FASTAPI_URL")
+pipeline_url = f"{fastapi_url}/pipeline/process-dataset"
 
 def go_to_login_page():
     # Clear all session state keys except 'page'
@@ -29,7 +33,7 @@ def run_dataset_processing():
         }
 
         # Send POST request to FastAPI to start dataset processing
-        response = requests.post(fastapi_url, headers=headers)
+        response = requests.post(pipeline_url, headers=headers)
 
         # Check if the request was successful
         if response.status_code == 200:

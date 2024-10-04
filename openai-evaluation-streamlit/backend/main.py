@@ -1,13 +1,13 @@
 import os
 import sys
 from dotenv import load_dotenv
-from backend.data_handling.clone_repo import clone_repository
-from backend.data_handling.load_dataset import load_gaia_dataset
-from backend.api_utils.amazon_s3_utils import init_s3_client, upload_files_to_s3_and_update_paths
+from data_handling.clone_repo import clone_repository
+from data_handling.load_dataset import load_gaia_dataset
+from api_utils.amazon_s3_utils import init_s3_client, upload_files_to_s3_and_update_paths
 from huggingface_hub import login
-from backend.api_utils.azure_sql_utils import insert_dataframe_to_sql, set_sqlalchemy_connection_params  # Import the setter function
+from api_utils.azure_sql_utils import insert_dataframe_to_sql, set_sqlalchemy_connection_params  # Import the setter function
 from datetime import datetime
-from backend.data_handling.delete_cache import delete_cache_folder
+from data_handling.delete_cache import delete_cache_folder
 
 # Load environment variables from .env file
 load_dotenv()

@@ -1,14 +1,14 @@
 import os
 import logging
 from fastapi import FastAPI
-from backend.fast_api.auth import auth_router
-from backend.fast_api.s3_endpoints import s3_router
-from backend.fast_api.gpt_endpoints import gpt_router
-from backend.fast_api.db_endpoints import db_router
-from backend.fast_api.pipeline_endpoints import pipeline_router
-from backend.api_utils.amazon_s3_utils import initialize_s3_client_and_bucket, get_s3_client
-from backend.api_utils.chatgpt_utils import init_openai
-from backend.api_utils.azure_sql_utils import set_sqlalchemy_connection_params  # new function to set parameters
+from fast_api.auth import auth_router
+from fast_api.s3_endpoints import s3_router
+from fast_api.gpt_endpoints import gpt_router
+from fast_api.db_endpoints import db_router
+from fast_api.pipeline_endpoints import pipeline_router
+from api_utils.amazon_s3_utils import initialize_s3_client_and_bucket, get_s3_client
+from api_utils.chatgpt_utils import init_openai
+from api_utils.azure_sql_utils import set_sqlalchemy_connection_params  # new function to set parameters
 
 logger = logging.getLogger("uvicorn")
 logger.setLevel(logging.INFO)

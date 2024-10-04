@@ -1,10 +1,14 @@
+import os
+from dotenv import load_dotenv
 import requests
 import matplotlib.pyplot as plt
 import streamlit as st
 import pandas as pd
 
-# URL of your FastAPI server
-FASTAPI_BASE_URL = "http://localhost:8000"  # Update with your actual FastAPI URL
+
+load_dotenv()
+
+fastapi_url = os.getenv("FASTAPI_URL")
 
 def go_back_to_main():
     st.session_state.page = 'user_page'
@@ -30,7 +34,7 @@ def fetch_questions_from_fastapi():
         }
 
         # Send request with JWT token in headers
-        response = requests.get(f"{FASTAPI_BASE_URL}/db/questions", headers=headers)
+        response = requests.get(f"{fastapi_url}/db/questions", headers=headers)
         response.raise_for_status()  # Raise an error for bad responses
 
         # Convert the response to a DataFrame
@@ -62,7 +66,7 @@ def fetch_user_results_from_fastapi(user_id):
         }
 
         # Send request with JWT token in headers
-        response = requests.get(f"{FASTAPI_BASE_URL}/db/user_results/{user_id}", headers=headers)
+        response = requests.get(f"{fastapi_url}/db/user_results/{user_id}", headers=headers)
         response.raise_for_status()  # Raise an error for bad responses
 
         # Convert the response to a DataFrame

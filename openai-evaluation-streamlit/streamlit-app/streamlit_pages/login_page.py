@@ -1,8 +1,14 @@
+import os
+from dotenv import load_dotenv
 import streamlit as st
 import requests
 
-# Define your FastAPI endpoint
-fastapi_url = "http://127.0.0.1:8000/auth/login"
+# Load environment variables from .env file
+load_dotenv()
+
+fastapi_url = os.getenv("FASTAPI_URL")
+
+login_url = f"{fastapi_url}/auth/login"
 
 def go_to_register():
     st.session_state['login_success'] = False
@@ -20,7 +26,7 @@ def on_login_click():
 
     try:
         with st.spinner('Logging in...'):
-            response = requests.post(fastapi_url, json=login_data)
+            response = requests.post(login_url, json=login_data)
             
             if response.status_code == 200:
                 result = response.json()

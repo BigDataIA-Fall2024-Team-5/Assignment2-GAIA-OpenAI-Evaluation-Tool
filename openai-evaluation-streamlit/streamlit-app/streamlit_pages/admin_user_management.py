@@ -1,7 +1,11 @@
-import streamlit as st
+import os
 import requests
+import streamlit as st
+from dotenv import load_dotenv
 
-fastapi_base_url = "http://127.0.0.1:8000/db"
+load_dotenv()
+
+fastapi_url = os.getenv("FASTAPI_URL")
 
 def go_to_login_page():
     for key in list(st.session_state.keys()):
@@ -23,7 +27,7 @@ def fetch_all_users_from_fastapi():
         }
 
         # Send request with JWT token in headers
-        response = requests.get(f"{fastapi_base_url}/users", headers=headers)
+        response = requests.get(f"{fastapi_url}/db/users", headers=headers)
 
         if response.status_code == 200:
             return response.json()  # Return the JSON response
@@ -59,7 +63,7 @@ def handle_delete_user_using_fastapi(user_id, username):
         }
 
         # Send DELETE request to FastAPI backend with admin's user_id
-        delete_url = f"{fastapi_base_url}/users/{user_id}?admin={admin_user_id}"
+        delete_url = f"{fastapi_url}/db/users/{user_id}?admin={admin_user_id}"
         response = requests.delete(delete_url, headers=headers)
 
         if response.status_code == 200:
@@ -92,7 +96,7 @@ def handle_promote_user_using_fastapi(user_id, username):
             "Authorization": f"Bearer {token}"
         }
 
-        promote_url = f"{fastapi_base_url}/users/{user_id}/promote?admin={admin_user_id}"
+        promote_url = f"{fastapi_url}/db/users/{user_id}/promote?admin={admin_user_id}"
         response = requests.put(promote_url, headers=headers)
 
         if response.status_code == 200:

@@ -1,8 +1,8 @@
 from fastapi import APIRouter, HTTPException, Depends, Query
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, ExpiredSignatureError
-from backend.fast_api.jwt_handler import decode_token
-from backend.api_utils.azure_sql_utils import (
+from fast_api.jwt_handler import decode_token
+from api_utils.azure_sql_utils import (
     fetch_all_users, 
     remove_user, 
     promote_to_admin, 

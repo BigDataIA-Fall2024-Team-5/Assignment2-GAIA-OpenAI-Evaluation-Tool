@@ -1,11 +1,13 @@
 # explore_questions.py
 import os
+from dotenv import load_dotenv
 import streamlit as st
 import pandas as pd
 import requests
 
-# FastAPI URLs
-FASTAPI_URL = "http://localhost:8000"
+load_dotenv()
+
+fastapi_url = os.getenv("FASTAPI_URL")
 
 def go_back_to_user_page():
     # Reset session state but keep user info
@@ -99,7 +101,7 @@ def fetch_questions_from_fastapi():
         if headers is None:
             return pd.DataFrame()
 
-        response = requests.get(f"{FASTAPI_URL}/db/questions", headers=headers)
+        response = requests.get(f"{fastapi_url}/db/questions", headers=headers)
         json_data = handle_api_response(response)
 
         if json_data:
@@ -118,7 +120,7 @@ def fetch_user_results_from_fastapi(user_id):
         if headers is None:
             return pd.DataFrame()
 
-        response = requests.get(f"{FASTAPI_URL}/db/user_results/{user_id}", headers=headers)
+        response = requests.get(f"{fastapi_url}/db/user_results/{user_id}", headers=headers)
         json_data = handle_api_response(response)
 
         if json_data:
@@ -144,7 +146,7 @@ def update_user_result_in_fastapi(user_id, task_id, status, chatgpt_response):
             "chatgpt_response": chatgpt_response
         }
 
-        response = requests.put(f"{FASTAPI_URL}/db/update_result", json=data, headers=headers)
+        response = requests.put(f"{fastapi_url}/db/update_result", json=data, headers=headers)
         handle_api_response(response, success_message="Result updated successfully!")
 
     except Exception as e:
@@ -163,7 +165,7 @@ def fetch_pdf_summary_from_fastapi(file_name, extraction_method):
             "extraction_method": extraction_method
         }
 
-        response = requests.post(f"{FASTAPI_URL}/s3/fetch_pdf_summary/", json=data, headers=headers)
+        response = requests.post(f"{fastapi_url}/s3/fetch_pdf_summary/", json=data, headers=headers)
         json_data = handle_api_response(response)
 
         if json_data:
@@ -189,7 +191,7 @@ def get_chatgpt_response_via_fastapi(question, instructions=None, preprocessed_d
             "preprocessed_data": preprocessed_data
         }
 
-        response = requests.post(f"{FASTAPI_URL}/gpt/ask", json=data, headers=headers)
+        response = requests.post(f"{fastapi_url}/gpt/ask", json=data, headers=headers)
         json_data = handle_api_response(response)
 
         if json_data:
@@ -214,7 +216,7 @@ def compare_and_update_status_via_fastapi(selected_row, chatgpt_response, instru
             "instructions": instructions
         }
 
-        response = requests.post(f"{FASTAPI_URL}/gpt/compare", json=data, headers=headers)
+        response = requests.post(f"{fastapi_url}/gpt/compare", json=data, headers=headers)
         json_data = handle_api_response(response)
 
         if json_data:

@@ -1,0 +1,9 @@
+# Ignore cache directories
+.cache
+
+# Other common directories to ignore
+.git
+__pycache__
+.pyc
+.env
+.gitignore

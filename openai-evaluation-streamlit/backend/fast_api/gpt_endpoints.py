@@ -4,8 +4,8 @@ from jose import JWTError, ExpiredSignatureError
 from pydantic import BaseModel
 from typing import Optional
 import logging
-from backend.api_utils.chatgpt_utils import get_chatgpt_response, compare_and_update_status
-from backend.fast_api.jwt_handler import decode_token
+from api_utils.chatgpt_utils import get_chatgpt_response, compare_and_update_status
+from fast_api.jwt_handler import decode_token
 
 # Set up a logger
 logger = logging.getLogger("uvicorn")
