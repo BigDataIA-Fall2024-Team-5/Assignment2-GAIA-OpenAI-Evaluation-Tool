@@ -1,5 +1,7 @@
 import os
+import boto3
 import fitz  # PyMuPDF
+from botocore.exceptions import ClientError
 from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 
 def process_pdf(**kwargs):
@@ -11,6 +13,7 @@ def process_pdf(**kwargs):
     print(f"Starting process_pdf with bucket: {bucket}, bronze_folder: {bronze_folder}, silver_folder: {silver_folder}")
     
     s3_hook = S3Hook(aws_conn_id='aws_region')
+    s3_client = s3_hook.get_conn()
     
     pdf_list = ti.xcom_pull(task_ids='get_pdf_list')
     
@@ -21,14 +24,26 @@ def process_pdf(**kwargs):
         return
 
     for pdf_key in pdf_list:
+        local_pdf_path = None
+        local_extracted_path = None
         try:
             local_pdf_path = f"/tmp/{os.path.basename(pdf_key)}"
             
-            full_pdf_key = f"{bronze_folder}/{pdf_key}" if not pdf_key.startswith(bronze_folder) else pdf_key
-            print(f"Attempting to download: {full_pdf_key}")
+            print(f"Attempting to download: {pdf_key}")
+            print(f"Local PDF path: {local_pdf_path}")
             
-            s3_hook.download_file(key=full_pdf_key, bucket_name=bucket, local_path=local_pdf_path)
-            print(f"Downloaded {full_pdf_key} to {local_pdf_path}")
+            # Download the file using boto3
+            try:
+                s3_client.download_file(bucket, pdf_key, local_pdf_path)
+                print(f"Downloaded {pdf_key} to {local_pdf_path}")
+            except ClientError as e:
+                print(f"Error downloading {pdf_key}: {str(e)}")
+                continue
+            
+            # Check if the file was actually downloaded
+            if not os.path.exists(local_pdf_path):
+                print(f"Failed to download file: {local_pdf_path}")
+                continue
             
             doc = fitz.open(local_pdf_path)
             text_content = ""
@@ -44,17 +59,19 @@ def process_pdf(**kwargs):
             
             silver_key = f"{silver_folder}/{extracted_file_name}"
             print(f"Attempting to upload to S3: {silver_key}")
-            s3_hook.load_file(filename=local_extracted_path, key=silver_key, bucket_name=bucket, replace=True)
+            s3_client.upload_file(local_extracted_path, bucket, silver_key)
             print(f"Uploaded {local_extracted_path} to S3://{bucket}/{silver_key}")
             
         except Exception as e:
             print(f"Error processing {pdf_key}: {str(e)}")
+            print(f"Error type: {type(e).__name__}")
+            print(f"Error args: {e.args}")
         
         finally:
-            if os.path.exists(local_pdf_path):
+            if local_pdf_path and os.path.exists(local_pdf_path):
                 os.remove(local_pdf_path)
                 print(f"Removed local file: {local_pdf_path}")
-            if os.path.exists(local_extracted_path):
+            if local_extracted_path and os.path.exists(local_extracted_path):
                 os.remove(local_extracted_path)
                 print(f"Removed local file: {local_extracted_path}")
 
