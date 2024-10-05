@@ -4,6 +4,12 @@ FROM python:3.11-slim
 # Set the working directory inside the container
 WORKDIR /backend
 
+# Install system dependencies (including git and git-lfs)
+RUN apt-get update && apt-get install -y \
+    git \
+    git-lfs \
+    && git-lfs install
+
 # Copy the requirements.txt file into the container
 COPY requirements.txt /backend/
 
