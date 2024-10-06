@@ -17,6 +17,9 @@ def go_to_login_page():
     # Set the page to login page
     st.session_state.page = 'login'
 
+def gotoexpirypage():
+    st.session_state.page = 'session_expired'
+    st.experimental_rerun()
 
 # Callback to trigger dataset processing logic with JWT authentication
 def run_dataset_processing():
@@ -45,7 +48,8 @@ def run_dataset_processing():
             # Handle unauthorized access (JWT token issues)
             st.session_state['dataset_processing_status'] = "Unauthorized access. Please log in again."
             # Add a button to redirect to the login page
-            st.button("Go to Login Page", on_click=go_to_login_page)
+            gotoexpirypage()
+            return None
         else:
             st.session_state['dataset_processing_status'] = f"Error: {response.status_code} - {response.text}"
 

@@ -10,21 +10,13 @@ load_dotenv()
 fastapi_url = os.getenv("FASTAPI_URL")
 
 def go_back_to_user_page():
-    keys_to_remove = ['df', 'user_results', 'show_instructions', 'current_page', 'last_selected_row_index', 'chatgpt_response']
+    keys_to_remove = ['df', 'user_results', 'show_instructions', 'current_page', 'last_selected_row_index', 'chatgpt_response','session_expired']
     
     for key in keys_to_remove:
         if key in st.session_state:
             del st.session_state[key]
 
     st.session_state.page = 'user_page'
-
-def go_to_login_page():
-    for key in list(st.session_state.keys()):
-        if key != 'page': 
-            del st.session_state[key]
-    
-    # Set the page to login page
-    st.session_state.page = 'login'
 
 # Helper function to get JWT headers
 def get_jwt_headers():
@@ -37,11 +29,15 @@ def get_jwt_headers():
     }
     return headers
 
+def gotoexpirypage():
+    st.session_state.page = 'session_expired'
+    st.experimental_rerun()
+    
 # Helper function to handle API responses
 def handle_api_response(response, success_message=None):
     if response.status_code == 401:
         st.error(response.json().get('detail', "Authentication error. Please log in again."))
-        st.button("Go to Login Page", on_click=go_to_login_page)
+        gotoexpirypage()
         return None
     elif response.status_code == 200:
         if success_message:
@@ -292,8 +288,8 @@ def initialize_session_state(df):
         st.session_state.chatgpt_response = None  # Store the ChatGPT response
     if 'final_status_updated' not in st.session_state:
         st.session_state.final_status_updated = False  # Track if the final status was updated
-
-
+    if 'session_expired' not in st.session_state:
+        st.session_state.session_expired= False  # Track if the final status was updated
 # Sidebar Filters
 def add_sidebar_filters(df):
 

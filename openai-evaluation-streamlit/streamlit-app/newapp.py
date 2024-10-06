@@ -9,6 +9,7 @@ from streamlit_pages.explore_questions import run_explore_questions
 from streamlit_pages.validation_questions import run_validation_questions
 from streamlit_pages.test_questions import run_test_questions
 from streamlit_pages.view_summary import run_view_summary
+from streamlit_pages.session_expired_page import session_expired_page
 
 
 def main():
@@ -52,6 +53,8 @@ def main():
         run_test_questions()
     elif st.session_state.page == 'view_summary':
         run_view_summary()
+    elif st.session_state.page == 'session_expired':  # New page case
+        session_expired_page() 
 
 # Callback functions for navigation
 def go_to_login():

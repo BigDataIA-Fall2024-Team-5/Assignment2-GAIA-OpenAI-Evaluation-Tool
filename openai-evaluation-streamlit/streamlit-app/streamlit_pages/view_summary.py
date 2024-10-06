@@ -12,7 +12,6 @@ fastapi_url = os.getenv("FASTAPI_URL")
 def go_back_to_main():
     st.session_state.page = 'user_page'
 
-
 def go_to_login_page():
     for key in list(st.session_state.keys()):
         if key != 'page': 
@@ -20,6 +19,10 @@ def go_to_login_page():
     
     # Set the page to login page
     st.session_state.page = 'login'
+
+def gotoexpirypage():
+    st.session_state.page = 'session_expired'
+    st.experimental_rerun()
 
 # Fetch questions (GAIA dataset) from FastAPI with dataset_split
 def fetch_questions_from_fastapi(dataset_split="validation"):
@@ -43,7 +46,8 @@ def fetch_questions_from_fastapi(dataset_split="validation"):
         # Handle authentication errors
         if response.status_code == 401:
             st.error(response.json().get('detail', "Authentication error. Please log in again."))
-            st.button("Go to Login Page", on_click=go_to_login_page)
+            gotoexpirypage()
+            return None
         else:
             st.error(f"HTTP error occurred: {http_err}")
         return None
@@ -75,7 +79,8 @@ def fetch_user_results_from_fastapi(user_id, dataset_split="validation"):
         # Handle authentication errors
         if response.status_code == 401:
             st.error(response.json().get('detail', "Authentication error. Please log in again."))
-            st.button("Go to Login Page", on_click=go_to_login_page)
+            gotoexpirypage()
+            return None
         else:
             st.error(f"HTTP error occurred: {http_err}")
         return None

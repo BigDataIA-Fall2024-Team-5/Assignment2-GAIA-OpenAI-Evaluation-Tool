@@ -15,6 +15,10 @@ def go_to_login_page():
     # Set the page to login page
     st.session_state.page = 'login'
 
+def gotoexpirypage():
+    st.session_state.page = 'session_expired'
+    st.experimental_rerun()
+
 # Function to fetch all users from FastAPI with JWT token
 def fetch_all_users_from_fastapi():
     try:
@@ -33,7 +37,7 @@ def fetch_all_users_from_fastapi():
             return response.json()  # Return the JSON response
         elif response.status_code == 401:
             st.error(response.json().get('detail', "Authentication error. Please log in again."))
-            st.button("Go to Login Page", on_click=go_to_login_page)
+            gotoexpirypage()
             return []  # Return empty list on 401 error
         else:
             st.error(f"Failed to fetch users: {response.status_code}")
@@ -71,7 +75,7 @@ def handle_delete_user_using_fastapi(user_id, username):
             st.success(f"User '{username}' (ID: {user_id}) deleted successfully.")
         elif response.status_code == 401:
             st.error(response.json().get('detail', "Authentication error. Please log in again."))
-            st.button("Go to Login Page", on_click=go_to_login_page)
+            gotoexpirypage()
         else:
             st.error(f"Failed to delete user '{username}' (ID: {user_id}): {response.status_code}")
 
@@ -104,7 +108,7 @@ def handle_promote_user_using_fastapi(user_id, username):
             st.success(f"User '{username}' (ID: {user_id}) promoted to admin successfully.")
         elif response.status_code == 401:
             st.error(response.json().get('detail', "Authentication error. Please log in again."))
-            st.button("Go to Login Page", on_click=go_to_login_page)
+            gotoexpirypage()
         else:
             st.error(f"Failed to promote user '{username}' (ID: {user_id}): {response.status_code}")
 
