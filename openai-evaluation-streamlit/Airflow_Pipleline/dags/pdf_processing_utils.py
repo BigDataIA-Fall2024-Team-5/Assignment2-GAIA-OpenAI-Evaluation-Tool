@@ -57,7 +57,7 @@ def process_pdf(**kwargs):
                 f.write(text_content)
             print(f"Extracted content saved to {local_extracted_path}")
             
-            silver_key = f"{silver_folder}/{extracted_file_name}"
+            silver_key = f"{silver_folder}/PyMupdf/{extracted_file_name}"
             print(f"Attempting to upload to S3: {silver_key}")
             s3_client.upload_file(local_extracted_path, bucket, silver_key)
             print(f"Uploaded {local_extracted_path} to S3://{bucket}/{silver_key}")
