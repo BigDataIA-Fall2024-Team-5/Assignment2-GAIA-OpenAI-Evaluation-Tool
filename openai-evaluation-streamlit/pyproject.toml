@@ -1,18 +1,18 @@
 [tool.poetry]
 name = "openai-evaluation-streamlit"
 version = "0.1.0"
-description = "This package has all the libraries needed to run our code"
-authors = ["Dharun Karthick <dharun.ramaraj@gmail.com>"]
+description = ""
+authors = ["dharun-karthick-ramaraj <dharun.ramaraj@gmail.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.11"
-streamlit = "^1.38.0"
+python = "3.11"
+streamlit = "1.25.0"
 openai = "0.28"
 boto3 = "^1.35.19"
 pandas = "^2.2.2"
 datasets = "^3.0.0"
-sqlalchemy = ">=1.4.36,<2.0"  # Updated version for compatibility with Airflow
+sqlalchemy = ">=1.4.36,<2.0"
 huggingface-hub = "^0.24.7"
 python-dotenv = "^1.0.1"
 pymssql = "^2.3.1"
