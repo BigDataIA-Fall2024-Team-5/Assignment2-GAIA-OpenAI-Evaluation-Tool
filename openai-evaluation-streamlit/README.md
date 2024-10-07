@@ -36,7 +36,7 @@ This application leverages OpenAI's ChatGPT model to evaluate a dataset of quest
 │   │   ├── 📂 data_handling              # Data processing scripts (cloning repo, loading dataset)  
 │   │   ├── 📂 fast_api                   # FastAPI endpoints and authentication  
 │   │   ├── 📜 Dockerfile                 # Dockerfile for FastAPI  
-│   │   ├── 📜 main.py                    # Main FastAPI entry point  
+│   │   ├── 📜 main.py                    # Main Pipline for loading backend  
 │   │   ├── 📜 requirements.txt           # Dependencies for FastAPI  
 │   │   └── 📜 setup_database.py          # Database setup script  
 │   ├── 📂 streamlit-app                  # Streamlit app with multiple pages  
