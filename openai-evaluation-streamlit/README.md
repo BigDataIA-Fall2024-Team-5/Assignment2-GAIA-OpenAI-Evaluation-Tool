@@ -28,27 +28,28 @@ This application leverages OpenAI's ChatGPT model to evaluate a dataset of quest
 
 ## Project Structure
 
-📦 Assignment2-GAIA-OpenAI-Evaluation-Tool
-┣ 📂 openai-evaluation-streamlit
-┃ ┣ 📂 Airflow_Pipeline              # Airflow DAGs and pipeline scripts for PDF processing 
-┃ ┣ 📂 backend                       # Backend folder with FastAPI service and utilities
-┃ ┃ ┣ 📂 api_utils                   # Utilities for API interactions (AWS, Azure SQL, ChatGPT)
-┃ ┃ ┣ 📂 data_handling               # Data processing scripts (cloning repo, loading dataset)
-┃ ┃ ┣ 📂 fast_api                    # FastAPI endpoints and authentication
-┃ ┃ ┣ 📜 Dockerfile                  # Dockerfile for FastAPI
-┃ ┃ ┣ 📜 main.py                     # Main FastAPI entry point
-┃ ┃ ┣ 📜 requirements.txt            # Dependencies for FastAPI
-┃ ┃ ┗ 📜 setup_database.py           # Database setup script
-┃ ┣ 📂 streamlit-app                 # Streamlit app with multiple pages
-┃ ┃ ┣ 📂 streamlit_pages             # Streamlit pages for different functionalities
-┃ ┃ ┣ 📜 Dockerfile                  # Dockerfile for Streamlit app
-┃ ┃ ┣ 📜 newapp.py                   # Main entry point for the Streamlit app
-┃ ┃ ┗ 📜 requirements.txt            # Dependencies for Streamlit
-┣ 📜 docker-compose.yml              # Docker Compose configuration for FastAPI and Streamlit
-┣ 📜 .env                             # Environment variables for the application
-┣ 📜 poetry.lock                      # Poetry lock file for dependency management
-┣ 📜 pyproject.toml                   # Poetry configuration file
-┗ 📜 LICENSE                          # MIT License file
+📦 Assignment2-GAIA-OpenAI-Evaluation-Tool  
+├── 📂 openai-evaluation-streamlit  
+│   ├── 📂 Airflow_Pipeline               # Airflow DAGs and pipeline scripts for PDF processing  
+│   ├── 📂 backend                        # Backend folder with FastAPI service and utilities  
+│   │   ├── 📂 api_utils                  # Utilities for API interactions (AWS, Azure SQL, ChatGPT)  
+│   │   ├── 📂 data_handling              # Data processing scripts (cloning repo, loading dataset)  
+│   │   ├── 📂 fast_api                   # FastAPI endpoints and authentication  
+│   │   ├── 📜 Dockerfile                 # Dockerfile for FastAPI  
+│   │   ├── 📜 main.py                    # Main FastAPI entry point  
+│   │   ├── 📜 requirements.txt           # Dependencies for FastAPI  
+│   │   └── 📜 setup_database.py          # Database setup script  
+│   ├── 📂 streamlit-app                  # Streamlit app with multiple pages  
+│   │   ├── 📂 streamlit_pages            # Streamlit pages for different functionalities  
+│   │   ├── 📜 Dockerfile                 # Dockerfile for Streamlit app  
+│   │   ├── 📜 newapp.py                  # Main entry point for the Streamlit app  
+│   │   └── 📜 requirements.txt           # Dependencies for Streamlit  
+├── 📜 docker-compose.yml                 # Docker Compose configuration for FastAPI and Streamlit  
+├── 📜 .env                               # Environment variables for the application  
+├── 📜 poetry.lock                        # Poetry lock file for dependency management  
+├── 📜 pyproject.toml                     # Poetry configuration file  
+└── 📜 LICENSE                            # MIT License file  
+
 
 ### Folder Documentation
 
