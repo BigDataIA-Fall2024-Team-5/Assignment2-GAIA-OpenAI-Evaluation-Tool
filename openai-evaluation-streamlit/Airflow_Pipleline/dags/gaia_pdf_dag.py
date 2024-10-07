@@ -7,7 +7,7 @@ from s3_utils import get_pdf_list, test_s3_connection
 
 # Define your S3 bucket and folder names
 S3_BUCKET = 's3-openai-evaluation-app-storage'
-BRONZE_FOLDER = 'Bronze_pdf'
+BRONZE_FOLDER = 'bronze'
 SILVER_FOLDER = 'Silver_pdf'
 
 default_args = {

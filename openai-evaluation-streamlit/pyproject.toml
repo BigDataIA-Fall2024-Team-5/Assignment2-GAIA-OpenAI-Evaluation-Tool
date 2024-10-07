@@ -7,12 +7,12 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.11"
-streamlit = "1.25.0"
+streamlit = "^1.38.0"
 openai = "0.28"
 boto3 = "^1.35.19"
 pandas = "^2.2.2"
 datasets = "^3.0.0"
-sqlalchemy = "^2.0.34"
+sqlalchemy = ">=1.4.36,<2.0"  # Updated version for compatibility with Airflow
 huggingface-hub = "^0.24.7"
 python-dotenv = "^1.0.1"
 pymssql = "^2.3.1"
@@ -24,7 +24,9 @@ uvicorn = "^0.31.0"
 python-jose = "^3.3.0"
 pydantic = "^2.9.2"
 passlib = "^1.7.4"
-
+apache-airflow = "^2.10.2"
+apache-airflow-providers-amazon = "^8.29.0"
+pymupdf = "^1.24.11"
 
 [build-system]
 requires = ["poetry-core"]

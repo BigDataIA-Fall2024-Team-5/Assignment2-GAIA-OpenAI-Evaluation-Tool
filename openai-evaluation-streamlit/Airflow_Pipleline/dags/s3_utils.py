@@ -24,8 +24,8 @@ def get_pdf_list(**kwargs):
     bucket = kwargs['bucket']
     s3_hook = S3Hook(aws_conn_id='aws_region')
     
-    test_pdfs = s3_hook.list_keys(bucket_name=bucket, prefix='Bronze_pdf/Test/', delimiter='/')
-    validation_pdfs = s3_hook.list_keys(bucket_name=bucket, prefix='Bronze_pdf/Validation/', delimiter='/')
+    test_pdfs = s3_hook.list_keys(bucket_name=bucket, prefix='bronze/test/', delimiter='/')
+    validation_pdfs = s3_hook.list_keys(bucket_name=bucket, prefix='bronze/validation/', delimiter='/')
     
     print(f"Found {len(test_pdfs)-1} PDFs in test folder")
     print(f"Found {len(validation_pdfs)-1} PDFs in validation folder")
