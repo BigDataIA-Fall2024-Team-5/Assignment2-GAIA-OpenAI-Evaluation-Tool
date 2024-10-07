@@ -131,4 +131,4 @@ Once the application is up and running, you can access it at `http://localhost:8
 
 ## License
 
-This project is licensed under the MIT License. For more details, please refer to the [LICENSE](LICENSE) file.
+This project is licensed under the MIT License. For more details, please refer to the [LICENSE](../LICENSE) file.
