@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 
 from pdf_processing_utils import process_pdf
 from s3_utils import get_pdf_list, test_s3_connection
-
+from textract_processing import preprocess_pdf_with_textract
 # Define your S3 bucket and folder names
 S3_BUCKET = 's3-openai-evaluation-app-storage'
 BRONZE_FOLDER = 'bronze'
@@ -51,5 +51,15 @@ process_pdf_task = PythonOperator(
     },
     dag=dag,
 )
+preprocess_pdf_textract_task = PythonOperator(
+    task_id='preprocess_pdf_with_textract',
+    python_callable=preprocess_pdf_with_textract,
+    op_kwargs={
+        'bucket': S3_BUCKET,
+        'bronze_folder': BRONZE_FOLDER,
+        'silver_folder': SILVER_FOLDER,
+    },
+    dag=dag,
+)
 
-test_s3_connection_task >> get_pdf_list_task >> process_pdf_task
+test_s3_connection_task >> get_pdf_list_task >> [process_pdf_task, preprocess_pdf_textract_task]
