@@ -99,7 +99,7 @@ def fetch_all_questions(table_name):
         connection_string = get_sqlalchemy_connection_string()
         engine = create_engine(connection_string)
 
-        query = f"SELECT * FROM {table_name}"
+        query = text(f"SELECT * FROM {table_name}")
         
         # Use connection.execute to fetch data, then create a DataFrame
         with engine.connect() as connection:
