@@ -30,13 +30,13 @@ This application leverages OpenAI's ChatGPT model to evaluate a dataset of quest
 
 📦 Assignment2-GAIA-OpenAI-Evaluation-Tool  
 ├── 📂 openai-evaluation-streamlit  
-│   ├── 📂 Airflow_Pipeline               # Airflow DAGs and pipeline scripts for PDF processing  
+│   ├── 📂 Airflow_Docker_Pipeline        # Airflow DAGs and pipeline scripts for PDF processing  
 │   ├── 📂 backend                        # Backend folder with FastAPI service and utilities  
 │   │   ├── 📂 api_utils                  # Utilities for API interactions (AWS, Azure SQL, ChatGPT)  
 │   │   ├── 📂 data_handling              # Data processing scripts (cloning repo, loading dataset)  
 │   │   ├── 📂 fast_api                   # FastAPI endpoints and authentication  
 │   │   ├── 📜 Dockerfile                 # Dockerfile for FastAPI  
-│   │   ├── 📜 main.py                    # Main Pipline for loading backend  
+│   │   ├── 📜 main.py                    # Main Pipeline for loading backend  
 │   │   ├── 📜 requirements.txt           # Dependencies for FastAPI  
 │   │   └── 📜 setup_database.py          # Database setup script  
 │   ├── 📂 streamlit-app                  # Streamlit app with multiple pages  
@@ -53,7 +53,7 @@ This application leverages OpenAI's ChatGPT model to evaluate a dataset of quest
 
 ### Folder Documentation
 
-- **[Airflow_Pipeline](Airflow_Pipeline/README.md)**: Contains the Airflow DAGs and scripts for automating PDF processing workflows.
+- **[Airflow_Docker_Pipeline](Airflow_Docker_Pipeline/README.md)**: Contains the Airflow DAGs and scripts for automating PDF processing workflows.
 - **[backend](backend/README.md)**: Includes the FastAPI backend service for authentication, dataset processing, and API utilities.
   - **[api_utils](backend/api_utils/README.md)**: Utility scripts for interacting with AWS S3, Azure SQL, and the ChatGPT API, providing essential backend functionality.
   - **[fast_api](backend/fast_api/README.md)**: FastAPI endpoints for authentication, dataset management, and pipeline processing, along with JWT-based security features.
@@ -78,7 +78,7 @@ Make sure you have the following installed:
 
 1. Clone the Repository and Navigate to the Directory:
 
-   git clone https://github.com/your-username/openai-evaluation-streamlit.git  
+   git clone https://github.com/BigDataIA-Fall2024-Team-5/Assignment2-GAIA-OpenAI-Evaluation-Tool.git 
    cd openai-evaluation-streamlit  
 
 2. Set Up Environment Variables:
