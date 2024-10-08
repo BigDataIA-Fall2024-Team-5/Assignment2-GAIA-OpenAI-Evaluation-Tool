@@ -205,6 +205,7 @@ def fetch_pdf_summary_from_fastapi(file_name, extraction_method):
 
 
 # Function to get chatgpt response using FastAPI
+# Function to get chatgpt response using FastAPI
 def get_chatgpt_response_via_fastapi(question, instructions=None, preprocessed_data=None):
     try:
         headers = get_jwt_headers()
@@ -216,7 +217,7 @@ def get_chatgpt_response_via_fastapi(question, instructions=None, preprocessed_d
             "instructions": instructions,
             "preprocessed_data": preprocessed_data
         }
-
+        
         response = requests.post(f"{fastapi_url}/gpt/ask", json=data, headers=headers)
         json_data = handle_api_response(response)
 
@@ -229,72 +230,25 @@ def get_chatgpt_response_via_fastapi(question, instructions=None, preprocessed_d
         st.error(f"Error communicating with FastAPI: {e}")
         return None
 
-# Function to compare response using FastAPI
-def compare_and_update_status_via_fastapi(selected_row, chatgpt_response, instructions):
-    try:
-        headers = get_jwt_headers()
-        if headers is None:
-            return None
-
-        data = {
-            "row": selected_row.to_dict(),
-            "chatgpt_response": chatgpt_response,
-            "instructions": instructions
-        }
-
-        response = requests.post(f"{fastapi_url}/gpt/compare", json=data, headers=headers)
-        json_data = handle_api_response(response)
-
-        if json_data:
-            return json_data.get("comparison_result", "Error")
-        else:
-            return None
-
-    except Exception as e:
-        st.error(f"Error comparing response: {e}")
-        return None
-
-# Callback function for handling 'Send to ChatGPT'
 def handle_send_to_chatgpt(selected_row, selected_row_index, preprocessed_data):
-    user_id = st.session_state.get('user_id') 
-
-    # Get the current status from the user_results table
-    current_status = st.session_state.user_results.loc[selected_row_index, 'user_result_status']
-
-    # Get the response status from the user_results table
-    chatgpt_response = st.session_state.user_results.loc[selected_row_index, 'chatgpt_response']
-
-    # Determine if instructions should be used based on the current status
-    use_instructions = current_status.startswith("Incorrect")
-    
     # Call ChatGPT API, passing the preprocessed file data instead of a URL
     chatgpt_response = get_chatgpt_response_via_fastapi(
         selected_row['Question'], 
-        instructions=st.session_state.instructions if use_instructions else None, 
+        instructions=st.session_state.instructions, 
         preprocessed_data=preprocessed_data
     )
 
     if chatgpt_response:
-        # Compare response with the final answer
-        status = compare_and_update_status_via_fastapi(selected_row, chatgpt_response, st.session_state.instructions if use_instructions else None)
-        
-        # Update the status in session state immediately
-        st.session_state.user_results.at[selected_row_index, 'user_result_status'] = status
-    
-        # Now use the refactored update function to update the user result in FastAPI
-        update_user_result_in_fastapi(user_id, selected_row['task_id'], status, chatgpt_response)
-
-        # Store ChatGPT response in session state
+        # Store ChatGPT response in session state for display
         st.session_state.chatgpt_response = chatgpt_response
+        st.session_state.final_status_updated = True  # Ensure UI reflects updated response
 
-        # Ensure the UI reflects the updated status immediately
-        st.session_state.final_status_updated = True
-
-        # Show instructions if the response is incorrect
-        if status in ['Correct with Instruction', 'Incorrect with Instruction', 'Incorrect without Instruction']:
+        # Show instructions if necessary based on the current status
+        if st.session_state.user_results.at[selected_row_index, 'user_result_status'] in ['Incorrect with Instruction', 'Incorrect without Instruction', 'Correct with Instruction']:
             st.session_state.show_instructions = True
         else:
             st.session_state.show_instructions = False
+
 
 
 def initialize_session_state(df):
@@ -400,6 +354,7 @@ def run_test_questions():
         # Sidebar Filters and filter application
         st.sidebar.button("Back to Home Page", on_click=go_back_to_user_page, key="back_button_sidebar")
         selected_levels, selected_file_types, selected_statuses = add_sidebar_filters(st.session_state.user_results)
+        
         # Store filters in session state
         st.session_state.selected_levels = selected_levels
         st.session_state.selected_file_types = selected_file_types
@@ -443,6 +398,7 @@ def run_test_questions():
             file_name = selected_row.get('file_name', None)
             file_url = selected_row.get('file_path', None)
             preprocessed_data = None
+
         else:
             st.warning("No results available for the selected filters. Please adjust your filters.")
             selected_row = None  # Ensure `selected_row` is not used if there are no results
@@ -486,54 +442,67 @@ def run_test_questions():
             else:
                 st.session_state.instructions = selected_row.get('Annotator_Metadata_Steps', '')
                 st.session_state.show_instructions = False
-
             st.session_state.last_selected_row_index = selected_row_index
-            st.session_state.chatgpt_response = None  # Reset ChatGPT response
+            st.session_state.chatgpt_response = None  # Reset ChatGPT response for new selection
+
+        # Show the "Send to ChatGPT" button if applicable
+        if show_chatgpt_button:
+            if st.button("Send to ChatGPT", key=f"send_chatgpt_{selected_row_index}"):
+                handle_send_to_chatgpt(selected_row, selected_row_index, preprocessed_data)
 
         # Display ChatGPT response if available
-        if st.session_state.chatgpt_response:
+        if 'chatgpt_response' in st.session_state and st.session_state.chatgpt_response:
             st.write(f"**ChatGPT's Response:** {st.session_state.chatgpt_response}")
 
-        # Conditionally show either "Send to ChatGPT" button or "Send to ChatGPT with Instructions" button
-        if not st.session_state.show_instructions and current_status != "Correct with Instruction":
-            if show_chatgpt_button:
-                if st.button("Send to ChatGPT", on_click=handle_send_to_chatgpt, args=(selected_row, selected_row_index, preprocessed_data), key=f"send_chatgpt_{selected_row_index}"):
-                    pass
-        else:
-            st.write("**The response was incorrect. Please provide instructions.**")
+        # Display the instructions text area if flagged
+        if st.session_state.show_instructions:
+            st.write("**The response was marked as needing instructions. Please provide instructions if needed.**")
             st.session_state.instructions = st.text_area(
                 "Edit Instructions (Optional)",
                 value=st.session_state.instructions,
                 key=f"instructions_{selected_row_index}"
             )
-            if st.button("Send to ChatGPT with Instructions", key=f'send_button_{selected_row_index}'):
-                chatgpt_response = get_chatgpt_response_via_fastapi(
-                    selected_row['Question'], 
-                    instructions=st.session_state.instructions, 
-                    preprocessed_data=preprocessed_data
-                )
 
-                if chatgpt_response:
-                    st.write(f"**ChatGPT's Response with Instructions:** {chatgpt_response}")
-                    status = compare_and_update_status_via_fastapi(selected_row, chatgpt_response, st.session_state.instructions)
-                    st.session_state.user_results.at[selected_row_index, 'user_result_status'] = status
-                    current_status = status
+        # Dropdown for updating the result status
+        status_options = ['Correct with Instruction', 'Correct without Instruction', 'Incorrect with Instruction', 'Incorrect without Instruction']
+        selected_status = st.selectbox(
+            "Update Result Status:",
+            options=status_options,
+            index=status_options.index(current_status) if current_status in status_options else 0,
+            key="status_dropdown"
+        )
+        # Submit button to confirm the selected status and update with FastAPI
+        if st.button("Submit Status", key=f"submit_status_{selected_row_index}"):
+            # Update the result in FastAPI using the selected status
+            update_user_result_in_fastapi(
+                user_id,
+                selected_row['task_id'],
+                selected_status,
+                st.session_state.chatgpt_response
+            )
+            st.session_state.user_results.at[selected_row_index, 'user_result_status'] = selected_status
+            st.success(f"Status updated to '{selected_status}' successfully!")
 
-                    update_user_result_in_fastapi(user_id=user_id, task_id=selected_row['task_id'], status=status, chatgpt_response=chatgpt_response)
-                    if status in ['Correct with Instruction', 'Incorrect with Instruction', 'Incorrect without Instruction']:
-                        st.session_state.show_instructions = True
-                    else:
-                        st.session_state.show_instructions = False
-                    st.session_state.chatgpt_response = chatgpt_response
+            # Update show_instructions based on the new status
+            if selected_status in ['Correct with Instruction', 'Incorrect with Instruction', 'Incorrect without Instruction']:
+                st.session_state.show_instructions = True
+            else:
+                st.session_state.show_instructions = False
+
+            # Clear previous elements before rerunning
+            st.session_state.last_selected_row_index = None  # Reset so that the rerun picks up the new selected row state
+            st.session_state.chatgpt_response = None         # Reset the response
+
+            # Rerun the app to reflect the updated status
+            st.experimental_rerun()
+
+
 
         # Function to apply background color based on the Final Result Status
         def style_status_based_on_final_result(status):
-            # Strip any leading/trailing spaces and make the check case-insensitive
             if status.strip().lower().startswith("correct"):
-                # Green background for Correct statuses
                 return 'background-color: #38761d; padding: 10px; border-radius: 5px;'
             else:
-                # Red background for non-Correct statuses
                 return 'background-color: #d62929; padding: 10px; border-radius: 5px;'
 
         # Get the background color based on the Final Result Status

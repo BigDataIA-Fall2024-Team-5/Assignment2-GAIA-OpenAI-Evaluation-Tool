@@ -24,9 +24,6 @@ def main():
     st.session_state.setdefault('user', '')
     st.session_state.setdefault('role', '')
 
-    # Debugging: Show session state values
-    st.write("Session State on Main Load:", st.session_state)
-    
     # Ensure user is logged in before accessing certain pages
     if st.session_state.page in ['user_page', 'explore_questions', 'admin', 'view_summary'] and not st.session_state['login_success']:
         st.error("Please log in to access this page.")
