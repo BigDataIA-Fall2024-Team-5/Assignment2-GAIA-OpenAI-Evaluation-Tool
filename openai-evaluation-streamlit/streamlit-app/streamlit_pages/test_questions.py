@@ -10,10 +10,22 @@ load_dotenv()
 fastapi_url = os.getenv("FASTAPI_URL")
 
 def go_back_to_user_page():
-    keys_to_remove = ['df', 'user_results', 'show_instructions', 'current_page', 'last_selected_row_index', 'chatgpt_response','session_expired']
+    # List of keys to keep in session state
+    keys_to_keep = [
+        "password",
+        "logout_confirmation",
+        "user_id",
+        "login_success",
+        "role",
+        "page",
+        "jwt_token",
+        "username",
+        "user"
+    ]
     
-    for key in keys_to_remove:
-        if key in st.session_state:
+    # Remove all keys not in the keys_to_keep list
+    for key in list(st.session_state.keys()):
+        if key not in keys_to_keep:
             del st.session_state[key]
 
     st.session_state.page = 'user_page'
@@ -32,7 +44,7 @@ def get_jwt_headers():
 def gotoexpirypage():
     st.session_state.page = 'session_expired'
     st.experimental_rerun()
-    
+
 # Helper function to handle API responses
 def handle_api_response(response, success_message=None):
     if response.status_code == 401:
@@ -47,15 +59,30 @@ def handle_api_response(response, success_message=None):
         st.error(f"API call failed: {response.status_code}")
         return None  
 
+# Helper function to update selected row index and rerun
+def update_selected_row(selected_row_index):
+    st.session_state.selected_row_index = selected_row_index
+
+def update_page(increment):
+    # Calculate max pages based on filtered DataFrame length
+    filtered_df = apply_filters(
+        st.session_state.user_results,
+        st.session_state.selected_levels,
+        st.session_state.selected_file_types,
+        st.session_state.selected_statuses
+    )
+    
+    max_page = (len(filtered_df) - 1) // 9
+    new_page = st.session_state.current_page + increment
+    st.session_state.current_page = max(0, min(new_page, max_page))  # Ensure the page is within bounds
+
 def display_question_table(df):
-    # Pagination controls
+    # Pagination controls without forcing rerun
     col1, col2 = st.columns([9, 1])
-    if col1.button("Previous", key="previous_button"):
-        if st.session_state.current_page > 0:
-            st.session_state.current_page -= 1
+    if col1.button("Previous", key="previous_button") and st.session_state.current_page > 0:
+        update_page(-1)
     if col2.button("Next", key="next_button"):
-        if st.session_state.current_page < (len(df) // 7):
-            st.session_state.current_page += 1
+        update_page(1)
 
     # Define pagination parameters
     page_size = 9
@@ -69,16 +96,11 @@ def display_question_table(df):
     # Style the table for display
     def style_dataframe_with_borders(df):
         return df.style.set_table_styles(
-            [{
-                'selector': 'table',
-                'props': [('border', '3px solid black'), ('width', '100%')]
-            }, {
-                'selector': 'th',
-                'props': [('border', '2px solid black'), ('font-weight', 'bold')]
-            }, {
-                'selector': 'td',
-                'props': [('border', '2px solid black'), ('width', '100%')]
-            }]
+            [   
+                {'selector': 'table', 'props': [('border', '3px solid black'), ('width', '100%')]},
+                {'selector': 'th', 'props': [('border', '2px solid black'), ('font-weight', 'bold')]},
+                {'selector': 'td', 'props': [('border', '2px solid black'), ('width', '100%')]}
+            ]
         )
 
     # Filter to show only the 'Question' and 'Level' columns
@@ -90,6 +112,7 @@ def display_question_table(df):
     st.dataframe(styled_df, use_container_width=True)
 
     return current_df
+
 
 # Fetch questions from FastAPI dynamically using the `dataset_split` query parameter
 def fetch_questions_from_fastapi(dataset_split="test"):
@@ -290,6 +313,8 @@ def initialize_session_state(df):
         st.session_state.final_status_updated = False  # Track if the final status was updated
     if 'session_expired' not in st.session_state:
         st.session_state.session_expired= False  # Track if the final status was updated
+
+
 # Sidebar Filters
 def add_sidebar_filters(df):
 
@@ -337,24 +362,23 @@ def apply_filters(df, selected_levels, selected_file_types, selected_statuses):
     if selected_statuses:
         df = df[df['user_result_status'].isin(selected_statuses)]
 
-    # Reset pagination when filters are applied
-    st.session_state.current_page = 0
+    # Check if the current page exceeds the new maximum number of pages after filtering
+    max_page = (len(df) - 1) // 9
+    if st.session_state.current_page > max_page:
+        st.session_state.current_page = max_page 
 
     return df
 
 def run_test_questions():
-
     # Fetch the questions from FastAPI
     df = fetch_questions_from_fastapi(dataset_split="test")
-
-    # Initialize session state for pagination and instructions
     initialize_session_state(df)
 
     # Fetch user-specific results from FastAPI
     user_id = st.session_state.get('user_id')
     user_results = fetch_user_results_from_fastapi(user_id, dataset_split="test")
 
-    # Check if user_results is empty
+    # Handle user results to merge if empty
     if user_results is None or user_results.empty:
         user_results = pd.DataFrame({
             'task_id': st.session_state.df['task_id'],
@@ -362,66 +386,66 @@ def run_test_questions():
             'chatgpt_response': ['N/A'] * len(st.session_state.df)
         })
 
-    # Check if both dataframes contain the 'task_id' column
+    # Merge only if task_id is in both dataframes
     if 'task_id' in st.session_state.df.columns and 'task_id' in user_results.columns:
         merged_df = st.session_state.df.merge(
             user_results[['task_id', 'user_result_status', 'chatgpt_response']],
             on='task_id',
             how='left'
         )
-
-        # After merging user_results with GaiaDataset, fill missing 'user_result_status' with 'N/A'
         merged_df['user_result_status'] = merged_df['user_result_status'].fillna('N/A')
         merged_df['chatgpt_response'] = merged_df['chatgpt_response'].fillna('N/A')
+        st.session_state.user_results = merged_df
 
-        st.session_state.user_results = merged_df  # Store merged DataFrame in session state
-
-        # Add a "Back" button to return to the user page in the sidebar using a callback
+        # Sidebar Filters and filter application
         st.sidebar.button("Back to Home Page", on_click=go_back_to_user_page, key="back_button_sidebar")
-
-        # Apply filters in the sidebar
         selected_levels, selected_file_types, selected_statuses = add_sidebar_filters(st.session_state.user_results)
+        # Store filters in session state
+        st.session_state.selected_levels = selected_levels
+        st.session_state.selected_file_types = selected_file_types
+        st.session_state.selected_statuses = selected_statuses
 
-        # Apply the selected filters to the dataframe
+        # Filter the data
         filtered_df = apply_filters(st.session_state.user_results, selected_levels, selected_file_types, selected_statuses)
 
-        # Reset pagination after filtering
-        if len(filtered_df) < st.session_state.current_page * 9:
-            st.session_state.current_page = 0
+        # Ensure pagination respects the bounds of filtered_df
+        max_page = (len(filtered_df) - 1) // 9
+        if st.session_state.current_page > max_page:
+            st.session_state.current_page = max_page
 
-        # Proceed with displaying the question table based on filtered data
-        if not filtered_df.empty:
-            current_df = display_question_table(filtered_df)
+        # Display filtered question table and ensure correct pagination
+        current_df = display_question_table(filtered_df) if not filtered_df.empty else pd.DataFrame()
+        
+        if not current_df.empty:
+            if 'selected_row_index' not in st.session_state or st.session_state.selected_row_index not in current_df.index:
+                st.session_state.selected_row_index = current_df.index[0]
 
-            # Only allow row selection if the DataFrame is not empty
-            if not current_df.empty:
-                selected_row_index = st.selectbox(
-                    "Select Question Index",
-                    options=current_df.index.tolist(),
-                    format_func=lambda x: f"{x}: {current_df.loc[x, 'Question'][:50]}...",
-                    key=f"selectbox_{st.session_state.current_page}"
-                )
+            selected_row_index = st.selectbox(
+                "Select Question Index",
+                options=current_df.index.tolist(),
+                format_func=lambda x: f"{x}: {current_df.loc[x, 'Question'][:50]}...",
+                index=current_df.index.get_loc(st.session_state.selected_row_index) if st.session_state.selected_row_index in current_df.index else 0,
+                key="selectbox"
+            )
 
-                # Selected row from the table
-                selected_row = current_df.loc[selected_row_index]
-                st.write("**Question:**", selected_row['Question'])
-                st.write("**Expected Final Answer:**", selected_row['FinalAnswer'])
+            if st.session_state.selected_row_index != selected_row_index:
+                st.session_state.selected_row_index = selected_row_index
 
-                # Get the current status from user-specific results
-                current_status = selected_row['user_result_status']
-                chatgpt_response = selected_row['chatgpt_response']
+            selected_row = current_df.loc[selected_row_index]
+            st.write("**Question:**", selected_row['Question'])
+            st.write("**Expected Final Answer:**", selected_row['FinalAnswer'])
 
-                # Get the file name and file path (S3 URL) if available
-                file_name = selected_row.get('file_name', None)
-                file_url = selected_row.get('file_path', None)
-                preprocessed_data = None
-            else:
-                st.warning("No results available for the selected filters. Please adjust your filters.")
-                selected_row = None  # Ensure `selected_row` is not used if there are no results
+            # Get the current status from user-specific results
+            current_status = selected_row['user_result_status']
+            chatgpt_response = selected_row['chatgpt_response']
+
+            # Get the file name and file path (S3 URL) if available
+            file_name = selected_row.get('file_name', None)
+            file_url = selected_row.get('file_path', None)
+            preprocessed_data = None
         else:
-            st.warning("No data available. Please try adjusting the filters.")
-            selected_row = None  # Ensure `selected_row` is not used if there is no filtered data
-
+            st.warning("No results available for the selected filters. Please adjust your filters.")
+            selected_row = None  # Ensure `selected_row` is not used if there are no results
     else:
         st.error("Error: 'task_id' is missing in one of the datasets.")
         if st.button("Back"):
@@ -432,10 +456,6 @@ def run_test_questions():
         current_status = selected_row['user_result_status']
         chatgpt_response = selected_row['chatgpt_response']
 
-        # Get the file name and file path (S3 URL) if available
-        file_name = selected_row.get('file_name', None)
-        preprocessed_data = None
-
         # Handle PDF file types and unsupported files
         file_extension = os.path.splitext(file_name)[1].lower() if file_name else None
         show_chatgpt_button = False  # Flag to control whether the "Send to ChatGPT" button is shown
@@ -443,15 +463,7 @@ def run_test_questions():
         # Fetch the PDF summary and display options
         if file_extension == '.pdf':
             st.write("**File Type:** PDF")
-
-            # Let the user select the extraction method (PyMuPDF or Amazon Textract)
-            extraction_method = st.radio(
-                "Choose PDF extraction method:",
-                ("PyMuPDF", "Amazon Textract"),
-                index=0
-            )
-
-            # Fetch the PDF summary from FastAPI
+            extraction_method = st.radio("Choose PDF extraction method:", ("PyMuPDF", "Amazon Textract"), index=0)
             pdf_summary = fetch_pdf_summary_from_fastapi(file_name, extraction_method)
             if pdf_summary:
                 st.write(f"**PDF Summary ({extraction_method}):**")
@@ -461,21 +473,19 @@ def run_test_questions():
         else:
             if file_extension:
                 st.error(f"Unsupported file type: {file_extension}")
-                show_chatgpt_button = False  # Disable ChatGPT button for unsupported files
+                show_chatgpt_button = False
             else:
-                preprocessed_data = None  # No file, but we can still send the question to ChatGPT
+                preprocessed_data = None
                 show_chatgpt_button = True  # Allow ChatGPT button for questions with no file
 
         # Update session state for instructions when selecting a new question
         if 'last_selected_row_index' not in st.session_state or st.session_state.last_selected_row_index != selected_row_index:
-            # Conditions to show the Edit Instructions box:
-            # Show instructions if the result is 'Correct with Instructions', 'Incorrect with Instructions', or 'Incorrect without Instruction'
             if current_status in ['Correct with Instruction', 'Incorrect with Instruction', 'Incorrect without Instruction']:
                 st.session_state.instructions = selected_row.get('Annotator_Metadata_Steps', '')  # Pre-fill from dataset
-                st.session_state.show_instructions = True  # Show the instructions box
+                st.session_state.show_instructions = True
             else:
                 st.session_state.instructions = selected_row.get('Annotator_Metadata_Steps', '')
-                st.session_state.show_instructions = False  # Hide instructions by default
+                st.session_state.show_instructions = False
 
             st.session_state.last_selected_row_index = selected_row_index
             st.session_state.chatgpt_response = None  # Reset ChatGPT response
@@ -486,25 +496,17 @@ def run_test_questions():
 
         # Conditionally show either "Send to ChatGPT" button or "Send to ChatGPT with Instructions" button
         if not st.session_state.show_instructions and current_status != "Correct with Instruction":
-            # Show "Send to ChatGPT" button if no instructions are required
             if show_chatgpt_button:
                 if st.button("Send to ChatGPT", on_click=handle_send_to_chatgpt, args=(selected_row, selected_row_index, preprocessed_data), key=f"send_chatgpt_{selected_row_index}"):
-                    # ChatGPT response will be processed in handle_send_to_chatgpt
                     pass
         else:
-            # If the response was incorrect, prompt for instructions and show "Send to ChatGPT with Instructions"
             st.write("**The response was incorrect. Please provide instructions.**")
-
-            # Pre-fill instructions from the dataset or previous inputs
             st.session_state.instructions = st.text_area(
                 "Edit Instructions (Optional)",
                 value=st.session_state.instructions,
-                key=f"instructions_{selected_row_index}"  # Unique key for each question
+                key=f"instructions_{selected_row_index}"
             )
-
-            # Show "Send to ChatGPT with Instructions" button instead
             if st.button("Send to ChatGPT with Instructions", key=f'send_button_{selected_row_index}'):
-                # Use the updated instructions to query ChatGPT
                 chatgpt_response = get_chatgpt_response_via_fastapi(
                     selected_row['Question'], 
                     instructions=st.session_state.instructions, 
@@ -513,22 +515,15 @@ def run_test_questions():
 
                 if chatgpt_response:
                     st.write(f"**ChatGPT's Response with Instructions:** {chatgpt_response}")
-
-                    # Compare and update status based on ChatGPT's response
                     status = compare_and_update_status_via_fastapi(selected_row, chatgpt_response, st.session_state.instructions)
                     st.session_state.user_results.at[selected_row_index, 'user_result_status'] = status
-                    current_status = status  # Update current_status
+                    current_status = status
 
-                    # Update the user-specific status in the Azure SQL Database
                     update_user_result_in_fastapi(user_id=user_id, task_id=selected_row['task_id'], status=status, chatgpt_response=chatgpt_response)
-
-                    # Update show_instructions flag based on new status
                     if status in ['Correct with Instruction', 'Incorrect with Instruction', 'Incorrect without Instruction']:
                         st.session_state.show_instructions = True
                     else:
                         st.session_state.show_instructions = False
-
-                    # Store the new ChatGPT response
                     st.session_state.chatgpt_response = chatgpt_response
 
         # Function to apply background color based on the Final Result Status

@@ -154,7 +154,7 @@ def read_pdf_summary_from_s3(file_name, extraction_method, s3_client, bucket_nam
         file_base_name = file_name[:-4] if file_name.endswith('.pdf') else file_name
 
         # Select the folder based on the extraction method
-        folder = "gold/textract" if extraction_method == "Amazon Textract" else "gold/pymupdf"
+        folder = "silver/pdf/textract" if extraction_method == "Amazon Textract" else "silver/pdf/pymupdf"
         summary_file = f"{folder}/{file_base_name}.txt"
 
         # Download the summary file from S3

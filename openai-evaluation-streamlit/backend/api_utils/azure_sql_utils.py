@@ -4,6 +4,7 @@ from sqlalchemy.types import NVARCHAR, Integer, DateTime
 from sqlalchemy.exc import SQLAlchemyError, OperationalError
 import logging
 import numpy as np
+import pyodbc
 
 # Initialize logging
 logger = logging.getLogger("uvicorn")
@@ -22,7 +23,7 @@ def set_sqlalchemy_connection_params(params: dict):
 
 def get_sqlalchemy_connection_string():
     """
-    Constructs an SQLAlchemy connection string for Azure SQL Database using the set parameters.
+    Constructs an SQLAlchemy connection string for Azure SQL Database using pyodbc.
     """
     if not _sqlalchemy_params:
         raise ValueError("Azure SQL connection parameters not set. Call set_sqlalchemy_connection_params first.")
@@ -32,7 +33,9 @@ def get_sqlalchemy_connection_string():
     password = _sqlalchemy_params['password']
     database = _sqlalchemy_params['database']
 
-    return f"mssql+pymssql://{user}:{password}@{server}/{database}"
+    # Using pyodbc with ODBC Driver 17 for SQL Server
+    return f"mssql+pyodbc://{user}:{password}@{server}/{database}?driver=ODBC+Driver+17+for+SQL+Server"
+
 
 # Insert DataFrame to SQL
 def insert_dataframe_to_sql(df, table_name):
@@ -97,11 +100,21 @@ def fetch_all_questions(table_name):
         engine = create_engine(connection_string)
 
         query = f"SELECT * FROM {table_name}"
-        df = pd.read_sql(query, con=engine)
         
-        # Convert DataFrame to JSON-serializable dictionary
-        result = df.map(convert_numpy_types).to_dict(orient="records")
-        return result
+        # Use connection.execute to fetch data, then create a DataFrame
+        with engine.connect() as connection:
+            result_proxy = connection.execute(query)
+            # Fetch all data from the executed query
+            result = result_proxy.fetchall()
+            # Get column names from the result proxy
+            columns = result_proxy.keys()
+            
+            # Convert the result to a DataFrame
+            df = pd.DataFrame(result, columns=columns)
+        
+        # Convert numpy data types in DataFrame to JSON-serializable dictionary
+        json_result = df.map(convert_numpy_types).to_dict(orient="records")
+        return json_result
 
     except SQLAlchemyError as e:
         raise RuntimeError(f"SQLAlchemy error during data fetch: {e}")

@@ -170,11 +170,14 @@ async def get_all_questions(
         questions = fetch_all_questions(table_name=table_name)
         return questions
     except ValueError as e:
+        print(f"ValueError: {e}")
         raise HTTPException(status_code=400, detail=str(e))
     except RuntimeError as e:
+        print(f"RuntimeError: {e}")
         raise HTTPException(status_code=500, detail="An unexpected error occurred while fetching questions.")
     except Exception as e:
-        raise HTTPException(status_code=500, detail="An unexpected error occurred while fetching questions.")
+        print(f"General Exception: {e}")
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
 
 # Fetch user-specific results endpoint with JWT validation
 @db_router.get("/user_results/{user_id}", response_model=List[UserResultResponse], tags=["User call"])
