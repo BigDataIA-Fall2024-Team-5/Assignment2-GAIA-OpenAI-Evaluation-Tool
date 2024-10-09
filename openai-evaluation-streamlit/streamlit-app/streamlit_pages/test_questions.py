@@ -387,7 +387,7 @@ def run_test_questions():
 
             selected_row = current_df.loc[selected_row_index]
             st.write("**Question:**", selected_row['Question'])
-            st.write("**Expected Final Answer:**", selected_row['FinalAnswer'])
+            st.write("**Check Manually as answer is not provided in the dataset**")
 
             # Get the current status from user-specific results
             current_status = selected_row['user_result_status']
@@ -462,38 +462,39 @@ def run_test_questions():
                 key=f"instructions_{selected_row_index}"
             )
 
-        # Dropdown for updating the result status
-        status_options = ['Correct with Instruction', 'Correct without Instruction', 'Incorrect with Instruction', 'Incorrect without Instruction']
-        selected_status = st.selectbox(
-            "Update Result Status:",
-            options=status_options,
-            index=status_options.index(current_status) if current_status in status_options else 0,
-            key="status_dropdown"
-        )
-        # Submit button to confirm the selected status and update with FastAPI
-        if st.button("Submit Status", key=f"submit_status_{selected_row_index}"):
-            # Update the result in FastAPI using the selected status
-            update_user_result_in_fastapi(
-                user_id,
-                selected_row['task_id'],
-                selected_status,
-                st.session_state.chatgpt_response
+        if 'chatgpt_response' in st.session_state and st.session_state.chatgpt_response:
+            # Dropdown for updating the result status
+            status_options = ['Correct with Instruction', 'Correct without Instruction', 'Incorrect with Instruction', 'Incorrect without Instruction']
+            selected_status = st.selectbox(
+                "Update Result Status:",
+                options=status_options,
+                index=status_options.index(current_status) if current_status in status_options else 0,
+                key="status_dropdown"
             )
-            st.session_state.user_results.at[selected_row_index, 'user_result_status'] = selected_status
-            st.success(f"Status updated to '{selected_status}' successfully!")
+            # Submit button to confirm the selected status and update with FastAPI
+            if st.button("Submit Status", key=f"submit_status_{selected_row_index}"):
+                # Update the result in FastAPI using the selected status
+                update_user_result_in_fastapi(
+                    user_id,
+                    selected_row['task_id'],
+                    selected_status,
+                    st.session_state.chatgpt_response
+                )
+                st.session_state.user_results.at[selected_row_index, 'user_result_status'] = selected_status
+                st.success(f"Status updated to '{selected_status}' successfully!")
 
-            # Update show_instructions based on the new status
-            if selected_status in ['Correct with Instruction', 'Incorrect with Instruction', 'Incorrect without Instruction']:
-                st.session_state.show_instructions = True
-            else:
-                st.session_state.show_instructions = False
+                # Update show_instructions based on the new status
+                if selected_status in ['Correct with Instruction', 'Incorrect with Instruction', 'Incorrect without Instruction']:
+                    st.session_state.show_instructions = True
+                else:
+                    st.session_state.show_instructions = False
 
-            # Clear previous elements before rerunning
-            st.session_state.last_selected_row_index = None  # Reset so that the rerun picks up the new selected row state
-            st.session_state.chatgpt_response = None         # Reset the response
+                # Clear previous elements before rerunning
+                st.session_state.last_selected_row_index = None  # Reset so that the rerun picks up the new selected row state
+                st.session_state.chatgpt_response = None         # Reset the response
 
-            # Rerun the app to reflect the updated status
-            st.experimental_rerun()
+                # Rerun the app to reflect the updated status
+                st.experimental_rerun()
 
 
 
