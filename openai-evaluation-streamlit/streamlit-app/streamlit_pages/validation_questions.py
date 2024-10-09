@@ -97,9 +97,9 @@ def display_question_table(df):
     def style_dataframe_with_borders(df):
         return df.style.set_table_styles(
             [   
-                {'selector': 'table', 'props': [('border', '3px solid black'), ('width', '100%')]},
-                {'selector': 'th', 'props': [('border', '2px solid black'), ('font-weight', 'bold')]},
-                {'selector': 'td', 'props': [('border', '2px solid black'), ('width', '100%')]}
+                {'selector': 'table', 'props': [('border-collapse', 'collapse')]},
+                {'selector': 'th', 'props': [('font-weight', 'bold'), ('text-align', 'left'), ('border', '1px solid black')]},
+                {'selector': 'td', 'props': [('text-align', 'left'), ('border', '1px solid black')]}
             ]
         )
 
@@ -109,8 +109,7 @@ def display_question_table(df):
     styled_df = style_dataframe_with_borders(question_df)
 
     # Display the styled table in Streamlit
-    st.dataframe(styled_df, use_container_width=True)
-
+    st.dataframe(styled_df, height=300, width=700)
     return current_df
 
 
