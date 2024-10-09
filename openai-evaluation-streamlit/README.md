@@ -8,6 +8,9 @@
 
 This application leverages OpenAI's ChatGPT model to evaluate a dataset of questions from the GAIA dataset. The app automates text extraction from PDF files, uploads them to AWS S3, and stores evaluation results in an Azure SQL database. It includes a web interface built with **Streamlit**, integrated with **FastAPI** for backend services, and secured using JWT tokenization. The app is fully containerized using **Docker Compose** for easy deployment.
 
+**Structural Diagram**:
+![Structural Diagram](diagrams/Structural%20Diagram.png)
+
 ## Table of Contents
 
 1. [Key Features](#key-features)
@@ -61,6 +64,8 @@ This application leverages OpenAI's ChatGPT model to evaluate a dataset of quest
 - **[streamlit-app](streamlit-app/README.md)**: The Streamlit application with a multi-page setup for user interactions, visualizations, and admin functions.
    - **[streamlit_pages](streamlit-app/streamlit_pages/README.md)**: Detailed documentation for each Streamlit page within the `streamlit-app`, covering the login, registration, user dashboard, and admin functionalities.
 
+### Backend Workflow Diagram
+![Backend Workflow Diagram](diagrams/Backend%20Workflow%20Diagram.png)
 
 ## Installation
 

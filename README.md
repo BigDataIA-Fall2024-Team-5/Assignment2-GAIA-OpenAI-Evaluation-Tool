@@ -1,9 +1,5 @@
 # Assignment2-GAIA-OpenAI-Evaluation-Tool
 
-- **Application Link: [Insert New Application URL Here]**
-- **Code Lab Link: [Insert Updated Code Lab Link Here]**
-- **Presentation Video Link: [Insert New Video Link Here]**
-
 Please refer to the [README.md](openai-evaluation-streamlit/README.md) inside the **openai-evaluation-streamlit** folder for detailed documentation on setup, features, and usage instructions.
 
 ## OpenAI Evaluation App - Quick Overview
