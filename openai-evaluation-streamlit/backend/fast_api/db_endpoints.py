@@ -37,7 +37,6 @@ class UserResultResponse(BaseModel):
     task_id: str
     user_result_status: Optional[str] = None
     chatgpt_response: Optional[str] = None
-    model_name: Optional[str] = None 
 
     class Config:
         from_attributes = True
@@ -68,7 +67,6 @@ class UpdateResultModel(BaseModel):
     status: str
     chatgpt_response: str
     dataset_split: Literal['test', 'validation']
-    model_name: Literal['gpt-3.5-turbo', 'gpt-4']
 
 
 # JWT token validation
@@ -186,19 +184,18 @@ async def get_all_questions(
 async def get_user_results(
     user_id: str, 
     dataset_split: Literal['test', 'validation'] = Query("validation", description="Specify 'test' or 'validation' dataset split."),
-    model_name: Optional[str] = Query(None, description="Specify the model name to filter results"),
     current_user: dict = Depends(get_current_user)
 ):
     """
-    Fetch user-specific results from the database by user_id, dataset_split, and optional model_name.
+    Fetch user-specific results from the database by user_id and dataset_split.
     """
     try:
-        # Fetch user results with dataset_split and model_name filters
-        results = fetch_user_results(user_id=user_id, dataset_split=dataset_split, model_name=model_name)
+        # Fetch user results with the dataset_split filter
+        results = fetch_user_results(user_id=user_id, dataset_split=dataset_split)
         if not results:
-            logger.info(f"No results found for user '{user_id}' in dataset '{dataset_split}' with model '{model_name}', returning an empty list.")
+            logger.info(f"No results found for user '{user_id}' in dataset '{dataset_split}', returning an empty list.")
             return []
-        logger.info(f"Fetched results for user '{user_id}' in dataset '{dataset_split}' with model '{model_name}'.")
+        logger.info(f"Fetched results for user '{user_id}' in dataset '{dataset_split}'.")
         return results
     except ValueError as e:
         logger.error(f"Error fetching results for user '{user_id}': {e}")
@@ -218,18 +215,17 @@ async def update_user_result(result_data: UpdateResultModel, current_user: dict 
     Update user result in the database.
     """
     try:
-        # Now include dataset_split and model_name in the update logic
+        # Now include dataset_split in the update logic
         update_success = update_user_result_in_db(
             result_data.user_id,
             result_data.task_id,
             result_data.status,
             result_data.chatgpt_response,
-            result_data.dataset_split,
-            result_data.model_name  # Pass model_name to the DB update function
+            result_data.dataset_split 
         )
         
         if update_success:
-            logger.info(f"Updated result for user '{result_data.user_id}', task '{result_data.task_id}', model '{result_data.model_name}', dataset '{result_data.dataset_split}'.")
+            logger.info(f"Updated result for user '{result_data.user_id}', task '{result_data.task_id}', dataset '{result_data.dataset_split}'.")
             return {"message": "Result updated successfully"}
         else: 
             raise HTTPException(status_code=400, detail="Failed to update the result.")
@@ -242,3 +238,4 @@ async def update_user_result(result_data: UpdateResultModel, current_user: dict 
     except Exception as e:
         logger.error(f"Unexpected error while updating user result: {e}")
         raise HTTPException(status_code=500, detail="An unexpected error occurred while updating the result.")
+

@@ -28,7 +28,6 @@ CREATE TABLE user_results (
     dataset_split NVARCHAR(50),
     user_result_status NVARCHAR(50),
     chatgpt_response NVARCHAR(MAX), 
-    model_name NVARCHAR(15),
     created_date DATETIME DEFAULT GETDATE(),
     FOREIGN KEY (user_id) REFERENCES users(user_id)
 );

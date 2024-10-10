@@ -123,51 +123,34 @@ def fetch_all_questions(table_name):
         raise RuntimeError(f"Unexpected error while fetching data: {e}")
 
 
-from sqlalchemy import create_engine, text
-from sqlalchemy.exc import OperationalError, SQLAlchemyError
-import pandas as pd
-
-# Fetch user results with dataset_split and optional model_name filtering
-def fetch_user_results(user_id, dataset_split, model_name=None):
+# Fetch user results with dataset_split filtering
+def fetch_user_results(user_id, dataset_split):
     """
-    Fetches the user-specific results from the Azure SQL Database filtered by dataset_split
-    and optionally by model_name.
+    Fetches the user-specific results from the Azure SQL Database filtered by dataset_split.
     Returns the data as a JSON-serializable list of dictionaries.
     """
     try:
         connection_string = get_sqlalchemy_connection_string()
         engine = create_engine(connection_string)
 
-        # Base SQL query
-        query = """
+        # SQL query now filters by both user_id and dataset_split
+        query = text("""
             SELECT 
                 user_id, 
                 task_id, 
                 user_result_status,
-                chatgpt_response,
-                model_name
+                chatgpt_response 
             FROM user_results 
             WHERE user_id = :user_id AND dataset_split = :dataset_split
-        """
-
-        # Include model_name filter if provided
-        if model_name:
-            query += " AND model_name = :model_name"
-        
-        # Prepare query parameters
-        params = {"user_id": user_id, "dataset_split": dataset_split}
-        if model_name:
-            params["model_name"] = model_name
-
+        """)
         with engine.connect() as connection:
-            result = connection.execute(text(query), params).fetchall()
+            result = connection.execute(query, {"user_id": user_id, "dataset_split": dataset_split}).fetchall()
 
         if result:
-            # Convert the result to a DataFrame
-            df = pd.DataFrame(result, columns=['user_id', 'task_id', 'user_result_status', 'chatgpt_response', 'model_name'])
+            df = pd.DataFrame(result, columns=['user_id', 'task_id', 'user_result_status', 'chatgpt_response'])
             
             # Convert DataFrame to JSON-serializable dictionary
-            result = df.applymap(convert_numpy_types).to_dict(orient="records")
+            result = df.map(convert_numpy_types).to_dict(orient="records")
 
             return result
         
@@ -185,9 +168,8 @@ def fetch_user_results(user_id, dataset_split, model_name=None):
 
 
 
-
 # Update user result
-def update_user_result_in_db(user_id, task_id, status, chatgpt_response, dataset_split, model_name, table_name='user_results'):
+def update_user_result_in_db(user_id, task_id, status, chatgpt_response, dataset_split, table_name='user_results'):
     """
     Updates user-specific result and ChatGPT response in the user_results table.
     Returns True if successful, False otherwise.
@@ -199,24 +181,16 @@ def update_user_result_in_db(user_id, task_id, status, chatgpt_response, dataset
         with engine.connect() as connection:
             transaction = connection.begin()
             try:
-                # Now also match on dataset_split and model_name to update the correct row
+                # Now also match on dataset_split to update the correct row
                 update_query = text(f"""
                     MERGE INTO {table_name} AS target
-                    USING (
-                        SELECT :user_id AS user_id, :task_id AS task_id, :status AS status, 
-                               :chatgpt_response AS chatgpt_response, :dataset_split AS dataset_split, 
-                               :model_name AS model_name
-                    ) AS source
-                    ON target.user_id = source.user_id 
-                       AND target.task_id = source.task_id 
-                       AND target.dataset_split = source.dataset_split
-                       AND target.model_name = source.model_name
+                    USING (SELECT :user_id AS user_id, :task_id AS task_id, :status AS status, :chatgpt_response AS chatgpt_response, :dataset_split AS dataset_split) AS source
+                    ON target.user_id = source.user_id AND target.task_id = source.task_id AND target.dataset_split = source.dataset_split
                     WHEN MATCHED THEN
-                        UPDATE SET user_result_status = source.status, 
-                                   chatgpt_response = source.chatgpt_response
+                        UPDATE SET user_result_status = source.status, chatgpt_response = source.chatgpt_response
                     WHEN NOT MATCHED THEN
-                        INSERT (user_id, task_id, user_result_status, chatgpt_response, dataset_split, model_name) 
-                        VALUES (source.user_id, source.task_id, source.status, source.chatgpt_response, source.dataset_split, source.model_name);
+                        INSERT (user_id, task_id, user_result_status, chatgpt_response, dataset_split) 
+                        VALUES (source.user_id, source.task_id, source.status, source.chatgpt_response, source.dataset_split);
                 """)
 
                 # Execute the MERGE query
@@ -225,8 +199,7 @@ def update_user_result_in_db(user_id, task_id, status, chatgpt_response, dataset
                     'task_id': task_id,
                     'status': status,
                     'chatgpt_response': chatgpt_response,
-                    'dataset_split': dataset_split,
-                    'model_name': model_name
+                    'dataset_split': dataset_split
                 })
 
                 # Commit transaction
@@ -245,7 +218,6 @@ def update_user_result_in_db(user_id, task_id, status, chatgpt_response, dataset
     except Exception as e:
         logger.error(f"Unexpected error during update: {e}")
         return False
-
 
 
 

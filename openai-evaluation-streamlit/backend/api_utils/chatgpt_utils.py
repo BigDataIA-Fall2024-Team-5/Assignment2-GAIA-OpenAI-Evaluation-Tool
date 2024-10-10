@@ -24,7 +24,7 @@ def init_openai(api_key):
     logger.info("OpenAI API initialized")
 
 # Function to send a question and preprocessed file data to ChatGPT
-def get_chatgpt_response(question, model_name="gpt-3.5-turbo", instructions=None, preprocessed_data=None):
+def get_chatgpt_response(question, instructions=None, preprocessed_data=None):
     # Construct the system message for the Chat API
     system_message = {
         "role": "system",
@@ -52,11 +52,11 @@ def get_chatgpt_response(question, model_name="gpt-3.5-turbo", instructions=None
         "4. If using reference data, integrate it seamlessly without mentioning the source.\n"
     )
 
-    logger.debug(f"Sending question to ChatGPT using model {model_name}: {user_message}")
+    logger.debug(f"Sending question to ChatGPT: {user_message}")
 
     try:
         response = openai.ChatCompletion.create(
-            model=model_name,
+            model="gpt-3.5-turbo",
             messages=[system_message, {"role": "user", "content": user_message}],
             temperature=0.2,
             max_tokens=MAX_TOKENS,  # Updated max_tokens to 300 to allow 200 words
@@ -75,19 +75,19 @@ def get_chatgpt_response(question, model_name="gpt-3.5-turbo", instructions=None
             answer = ' '.join(words[:MAX_WORDS]) + '...'
 
         logger.debug(f"ChatGPT Response: {answer.strip()}")
-        return answer.strip(), model_name  # Also return model name to store in database
+        return answer.strip()
 
     except (AuthenticationError, RateLimitError, APIConnectionError) as e:
         logger.error(f"OpenAI specific error: {e}")
-        return f"Error: {e.user_message}", model_name
+        return f"Error: {e.user_message}"
 
     except OpenAIError as e:
         logger.error(f"General OpenAI API error: {e}")
-        return "An error occurred while processing the request. Please try again later.", model_name
+        return "An error occurred while processing the request. Please try again later."
 
     except Exception as e:
         logger.error(f"Unexpected error: {e}")
-        return "An unexpected error occurred. Please contact support.", model_name
+        return "An unexpected error occurred. Please contact support."
 
 
 # Compare ChatGPT's response with the expected answer using OpenAI API

@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, ExpiredSignatureError
 from pydantic import BaseModel
-from typing import Optional, Literal
+from typing import Optional
 import logging
 from api_utils.chatgpt_utils import get_chatgpt_response, compare_and_update_status
 from fast_api.jwt_handler import decode_token
@@ -18,7 +18,6 @@ class AskRequest(BaseModel):
     question: str
     instructions: Optional[str] = None
     preprocessed_data: Optional[str] = None
-    model_name: Literal["gpt-3.5-turbo", "gpt-4"] = "gpt-3.5-turbo"
 
 class CompareRequest(BaseModel):
     row: dict
@@ -38,18 +37,10 @@ async def ask_gpt(request: AskRequest, token: str = Depends(oauth2_scheme)):
         question = request.question
         instructions = request.instructions
         preprocessed_data = request.preprocessed_data
-        model_name = request.model_name  # Extract the model name from the request
 
         # Pass the extracted data to the ChatGPT function
-        response, used_model_name = get_chatgpt_response(
-            question=question, 
-            model_name=model_name, 
-            instructions=instructions, 
-            preprocessed_data=preprocessed_data
-        )
-
-        # Return the response and the model name used
-        return {"response": response, "model_name": used_model_name}
+        response = get_chatgpt_response(question, instructions, preprocessed_data)
+        return {"response": response}
 
     except ExpiredSignatureError:
         logger.error("Token has expired")
