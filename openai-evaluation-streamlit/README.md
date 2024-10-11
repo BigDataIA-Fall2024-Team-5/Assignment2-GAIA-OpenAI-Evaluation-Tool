@@ -1,8 +1,15 @@
 # Assignment2-GAIA-OpenAI-Evaluation-Tool
 
-- **Application Link: [Insert New Application URL Here]**
-- **Code Lab Link: [Insert Updated Code Lab Link Here]**
-- **Presentation Video Link: [Insert New Video Link Here]**
+- **Code Lab Link: [[CodeLabs](https://codelabs-preview.appspot.com/?file_id=1jgfeDPBayTyQ2fWvncs1wMqrmskJkVCiFLTdYfeTh1k#0)] [[Google Drive Link](https://docs.google.com/document/d/1r1LFc9etDrDeeF5DGEBVaOHluS64qKRh/edit?usp=drive_link&ouid=117337672169848470672&rtpof=true&sd=true)] [[Github Location](docs/Assignment2_OpenAI_Evaluation_App.docx)]**
+- **Presentation Video Link: [[Google Drive Link](https://drive.google.com/file/d/1FgN-lEHbVfYQ6hQLEsMZnDbP6LPa-EFJ/view?usp=drive_link)] [[Github Location](demo/Assignment%202%20demo.mp4)]**
+- **FAST API Link: [[FastAPI deployed in EC2 Instance](http://3.145.73.49:8000/)]**
+- **Streamlit Application Link: [[Streamlit Aookucation deployed in EC2 Instance](http://3.145.73.49:8501/)]**
+- **Docker Repository: [[Docker Repository](https://hub.docker.com/repositories/dharunramaraj)]**
+- **PDF Evaluation Link: [[Google Drive Link](https://drive.google.com/file/d/1W5_tsqub1gHULE9xUUKbs1mgiOS16O1t/view?usp=sharing)] [[Github Location](docs/PDF_Extraction_API_Evaluation.pdf)]**
+- **Github Projects: [[Github projects](https://github.com/orgs/BigDataIA-Fall2024-Team-5/projects/4)]**
+
+
+
 
 ## OpenAI Evaluation App - Overview
 

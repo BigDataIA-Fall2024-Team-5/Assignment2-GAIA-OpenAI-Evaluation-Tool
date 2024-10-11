@@ -35,8 +35,8 @@ CREATE TABLE user_results (
 
 # Default user and admin credentials
 default_users = [
-    {"username": "admin", "password": "admin123", "role": "admin"},
-    {"username": "user", "password": "user123", "role": "user"}
+    {"username": "admin", "password": "admin", "role": "admin"},
+    {"username": "user", "password": "user", "role": "user"}
 ]
 
 def setup_database():
