@@ -1,6 +1,5 @@
 import pandas as pd
 from sqlalchemy import create_engine, text
-from sqlalchemy.types import NVARCHAR, Integer, DateTime
 from sqlalchemy.exc import SQLAlchemyError, OperationalError
 import logging
 import numpy as np
@@ -36,44 +35,50 @@ def get_sqlalchemy_connection_string():
     # Using pyodbc with ODBC Driver 17 for SQL Server
     return f"mssql+pyodbc://{user}:{password}@{server}/{database}?driver=ODBC+Driver+17+for+SQL+Server"
 
-
-# Insert DataFrame to SQL
 def insert_dataframe_to_sql(df, table_name):
     """
-    Inserts DataFrame into Azure SQL Database (replaces existing table).
+    Inserts a DataFrame into an Azure SQL Database, creating the table if it doesn't exist.
     """
     try:
+        # Set up the SQLAlchemy engine with fast_executemany for performance optimization
         connection_string = get_sqlalchemy_connection_string()
-        engine = create_engine(connection_string)
+        engine = create_engine(connection_string, fast_executemany=True)
 
         with engine.connect() as connection:
             transaction = connection.begin()
             try:
+                # Drop table if it exists
                 drop_table_query = text(f"IF OBJECT_ID('{table_name}', 'U') IS NOT NULL DROP TABLE {table_name};")
                 connection.execute(drop_table_query)
+
+                # Create the table with specified schema
+                create_table_query = text(f"""
+                    CREATE TABLE {table_name} (
+                        task_id NVARCHAR(50),
+                        Question NVARCHAR(MAX),
+                        Level INT,
+                        FinalAnswer NVARCHAR(MAX),
+                        file_name NVARCHAR(255),
+                        file_path NVARCHAR(MAX),
+                        Annotator_Metadata_Steps NVARCHAR(MAX),
+                        Annotator_Metadata_Number_of_steps NVARCHAR(MAX),
+                        Annotator_Metadata_How_long_did_this_take NVARCHAR(100),
+                        Annotator_Metadata_Tools NVARCHAR(MAX),
+                        Annotator_Metadata_Number_of_tools INT,
+                        result_status NVARCHAR(50),
+                        created_date DATETIME
+                    );
+                """)
+                connection.execute(create_table_query)
                 transaction.commit()
             except Exception as e:
                 transaction.rollback()
-                raise RuntimeError(f"Error dropping table '{table_name}': {e}")
+                raise RuntimeError(f"Error creating table '{table_name}': {e}")
 
-        # Insert the data into the new table
-        df.to_sql(table_name, engine, if_exists='replace', index=False, dtype={
-            'task_id': NVARCHAR(length=50),
-            'Question': NVARCHAR(length='max'),
-            'Level': Integer,
-            'FinalAnswer': NVARCHAR(length='max'),
-            'file_name': NVARCHAR(length=255),
-            'file_path': NVARCHAR(length='max'),
-            'Annotator_Metadata_Steps': NVARCHAR(length='max'),
-            'Annotator_Metadata_Number_of_steps': NVARCHAR(length='max'),
-            'Annotator_Metadata_How_long_did_this_take': NVARCHAR(length=100),
-            'Annotator_Metadata_Tools': NVARCHAR(length='max'),
-            'Annotator_Metadata_Number_of_tools': Integer,
-            'result_status': NVARCHAR(length=50),
-            'created_date': DateTime
-        })
+            # Insert the preprocessed data using SQLAlchemy connection
+            df.to_sql(table_name, con=connection, if_exists='append', index=False)
 
-        print("Data inserted successfuly to Azure SQL")
+        print("Data inserted successfully into Azure SQL")
 
     except SQLAlchemyError as e:
         raise RuntimeError(f"SQLAlchemy error during data insertion: {e}")

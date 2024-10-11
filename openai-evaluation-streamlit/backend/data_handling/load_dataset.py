@@ -1,4 +1,3 @@
-#load_dataset
 import os
 import pandas as pd
 from datasets import load_dataset
@@ -35,16 +34,23 @@ def load_gaia_dataset(cache_dir, split_name='validation'):
         # Flatten the 'Annotator Metadata' column
         df = preprocess_nested_data(df)
         
-        # Data cleaning: Convert 'file_name' and 'file_path' columns to string and handle NaNs
-        if 'file_name' in df.columns:
-            df['file_name'] = df['file_name'].astype(str).fillna('')  # Convert to string and replace NaNs with empty strings
-        if 'file_path' in df.columns:
-            df['file_path'] = df['file_path'].astype(str).fillna('')  # Convert to string and replace NaNs with empty strings
+        # Add a new column 'result_status' with an initial value 'N/A' if not already present
+        if 'result_status' not in df.columns:
+            df['result_status'] = 'N/A'
+
+        # Data cleaning and type conversion for string columns
+        string_columns = ['task_id', 'Question', 'FinalAnswer', 'file_name', 'file_path',
+                          'Annotator_Metadata_Steps', 'Annotator_Metadata_Number_of_steps',
+                          'Annotator_Metadata_How_long_did_this_take', 'Annotator_Metadata_Tools', 'result_status']
+        for col in string_columns:
+            df[col] = df[col].astype(str).replace('?', '', regex=False).fillna('')  # Convert to string, replace '?' with empty strings
         
-        # Add a new column 'result_status' with an initial value 'N/A'
-        df['result_status'] = 'N/A'
+        # Convert numeric columns, handling non-numeric values
+        df['Level'] = pd.to_numeric(df['Level'], errors='coerce').fillna(0).astype(int)
+        if 'Annotator_Metadata_Number_of_tools' in df.columns:
+            df['Annotator_Metadata_Number_of_tools'] = pd.to_numeric(df['Annotator_Metadata_Number_of_tools'], errors='coerce').fillna(0).astype(int)
         
-        # **Add the 'created_date' column with the current timestamp**
+        # Add the 'created_date' column with the current timestamp
         df['created_date'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
         print(f"Dataset for split '{split_name}' successfully converted to DataFrame with 'created_date'.")
@@ -64,6 +70,7 @@ def preprocess_nested_data(df):
         # Concatenate with the original DataFrame, dropping the original 'Annotator Metadata' column
         df = pd.concat([df.drop(columns=['Annotator Metadata']), metadata_df], axis=1)
     
+    # Rename columns to match database schema
     df = df.rename(columns={
         'Final answer': 'FinalAnswer',
         'Annotator_Metadata_Number of steps': 'Annotator_Metadata_Number_of_steps',
